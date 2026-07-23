@@ -602,7 +602,7 @@ function renderTable() {
       : '<span class="gaoquan-zero num-zero">—</span>';
     const hasVideo = r.video_url && r.video_url.length > 10;
     const playBtn = hasVideo
-      ? `<button class="btn-play" onclick="openVideo(${i},'${encodeURIComponent(r.name)}')">
+      ? `<button class="btn-play" onclick="openVideoByName('${encodeURIComponent(r.name)}')">
            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 3l10 5-10 5V3z"/></svg>播放
          </button>`
       : '<span style="color:var(--text-muted);font-size:11px">无链接</span>';
@@ -622,10 +622,12 @@ function renderTable() {
 }
 
 // ---------- 视频弹窗 ----------
-function openVideo(idx, encodedName) {
+function openVideoByName(encodedName) {
+  const name = decodeURIComponent(encodedName);
   const rows = window.currentRows || ALL_ROWS;
-  const r = rows[idx];
-  document.getElementById('modalTitle').textContent = decodeURIComponent(encodedName);
+  const r = rows.find(x => x.name === name);
+  if (!r) return;
+  document.getElementById('modalTitle').textContent = name;
   const meta = document.getElementById('modalMeta');
   const pc = PERSON_COLORS[r.person] || '#64748B';
   meta.innerHTML = `
