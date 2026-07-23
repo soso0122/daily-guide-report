@@ -315,7 +315,6 @@ video{max-width:100%;max-height:65vh;display:block}
           <tr>
             <th data-col="person">人物</th>
             <th data-col="name">素材名称</th>
-            <th data-col="status">状态</th>
             <th data-col="spend" class="sorted-desc">消耗</th>
             <th data-col="impressions">展示数</th>
             <th data-col="ctr">点击率%</th>
@@ -611,7 +610,6 @@ function renderTable() {
       <td><span class="person-badge" style="background:${bg};color:${pc}">${r.person}</span></td>
       <td><div style="display:flex;align-items:center;gap:4px">
         <span class="mat-name" title="${r.name}">${r.name}</span>${extBadge}</div></td>
-      <td><span class="status-badge ${statusCls}">${r.status}</span></td>
       <td>${fmt(r.spend)}</td>
       <td>${fmtInt(r.impressions)}</td>
       <td><span class="num">${r.ctr > 0 ? r.ctr.toFixed(2)+'%' : '—'}</span></td>
