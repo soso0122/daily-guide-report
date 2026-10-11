@@ -680,6 +680,7 @@ function initAuditChart() {
 }
 
 let _personType = 'all';  // 'all' | 'video' | 'tuwen'
+let _currentDateLabel = '';  // 当前渲染的单日日期（'MM/DD'）；多日为 ''
 let _personRows = [];
 let _personAudit = null;
 
@@ -842,6 +843,31 @@ function updateTypeCards(rows) {  const container = document.getElementById('typ
   const totConv  = allRows.reduce((s, r) => s + r.conversions, 0);
   const totGq    = allRows.reduce((s, r) => s + r.gaoquan, 0);
 
+  // 单日视图时，计算前一日各类型的差值（加减法）
+  let prevByType = null;
+  if (_currentDateLabel && ALL_DATES.length > 1) {
+    const idx = ALL_DATES.indexOf(_currentDateLabel);
+    if (idx > 0) {
+      const prevLabel = ALL_DATES[idx - 1];
+      const prevRows = ALL_ROWS_BY_DATE[prevLabel] || [];
+      prevByType = { video: {spend:0,imp:0,click:0,conv:0,gq:0}, tuwen: {spend:0,imp:0,click:0,conv:0,gq:0}, ai: {spend:0,imp:0,click:0,conv:0,gq:0} };
+      prevRows.forEach(r => {
+        const t = r.is_ai ? 'ai' : (r.is_tuwen && !r.is_homepage) ? 'tuwen' : 'video';
+        const p = prevByType[t];
+        p.spend += r.spend; p.imp += r.impressions; p.click += r.clicks;
+        p.conv += r.conversions; p.gq += r.gaoquan;
+      });
+    }
+  }
+
+  const diffFmt = (curVal, prevVal, digits, prefix, suffix) => {
+    const d = curVal - prevVal;
+    if (d === 0) return '<span class="kpi-diff">±0</span>';
+    const sign = d > 0 ? '+' : '-';
+    const cls = d > 0 ? 'up' : 'down';
+    return '<span class="kpi-diff ' + cls + '">' + sign + prefix + Math.abs(d).toFixed(digits) + suffix + '</span>';
+  };
+
   const types = [
     { key: 'video',    label: '视频', color: '#3B82F6', bg: '#EFF6FF',
        filter: r => !r.is_tuwen && !r.is_homepage },
@@ -907,6 +933,26 @@ function updateTypeCards(rows) {  const container = document.getElementById('typ
           <div style="font-size:15px;font-weight:700;color:#D97706;font-family:monospace">${deepRate}</div>
         </div>
       </div>
+      ${prevByType ? (() => {
+        const p = prevByType[t.key];
+        const pCpa = p.conv > 0 ? p.spend / p.conv : 0;
+        const pCtr = p.imp > 0 ? p.click / p.imp * 100 : 0;
+        const pCvr = p.click > 0 ? p.conv / p.click * 100 : 0;
+        const cCtr = imp > 0 ? click / imp * 100 : 0;
+        const cCvr = click > 0 ? conv / click * 100 : 0;
+        const cCpa = conv > 0 ? spend / conv : 0;
+        return `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed ${t.color}44;font-size:11px;color:#64748B;line-height:1.9">
+          <div style="font-weight:600;margin-bottom:2px;color:#94A3B8">较昨日</div>
+          ${diffFmt(spend, p.spend, 2, '¥', '')} 消耗　
+          ${diffFmt(imp, p.imp, 0, '', '')} 展示　
+          ${diffFmt(click, p.click, 0, '', '')} 点击<br>
+          ${diffFmt(cCtr, pCtr, 2, '', '%')} 点击率　
+          ${diffFmt(cCvr, pCvr, 2, '', '%')} 转化率　
+          ${diffFmt(conv, p.conv, 0, '', '')} 转化<br>
+          ${diffFmt(gq, p.gq, 0, '', '')} 高潜　
+          ${diffFmt(cCpa, pCpa, 2, '¥', '')} CPA
+        </div>`;
+      })() : ''}
     </div>`;
   }).join('');
 }
@@ -1078,6 +1124,7 @@ function renderDay(rows, dateLabel) {
   document.getElementById('kpi-deeprate').textContent= (tz ? (tg/tz*100).toFixed(1)+'%' : '—');
 
   // 与前一日对比（单日时显示加减差值；多日合并时不显示）
+  _currentDateLabel = /^\d{2}\/\d{2}$/.test(dateLabel) ? dateLabel : '';
   updateKpiDiffs(dateLabel, {spend:ts, imp:ti, clicks:tc, conv:tz, gaoquan:tg, cpa:cpa, ctr:ctr, cvr:cvr});
   // 更新筛选器（基于当前行）
   const persons = [...new Set(rows.map(r => r.person))];
