@@ -449,18 +449,18 @@ video{max-width:100%;max-height:65vh;display:block}
       <table id="watchTable">
         <thead>
           <tr>
-            <th>素材名称</th>
-            <th>状态</th>
-            <th>首投</th>
-            <th>末投</th>
-            <th>在投天数</th>
-            <th>停投次数</th>
-            <th>累计消耗</th>
-            <th>点击率</th>
-            <th>转化数</th>
-            <th>转化率</th>
-            <th>高潜</th>
-            <th>深转率</th>
+            <th data-col="name">素材名称</th>
+            <th data-col="status">状态</th>
+            <th data-col="first">首投</th>
+            <th data-col="last">末投</th>
+            <th data-col="active_days">在投天数</th>
+            <th data-col="stop_events">停投次数</th>
+            <th data-col="spend" class="sorted-desc">累计消耗</th>
+            <th data-col="ctr">点击率</th>
+            <th data-col="conv">转化数</th>
+            <th data-col="cvr">转化率</th>
+            <th data-col="gq">高潜</th>
+            <th data-col="deep_rate">深转率</th>
             <th>近14天轨迹</th>
           </tr>
         </thead>
@@ -1354,6 +1354,9 @@ function fmtInt(n) {
   return '<span class="num">' + n.toLocaleString() + '</span>';
 }
 
+let watchSortCol = '';   // 监控表当前排序列（空=名单顺序）
+let watchSortAsc = true;
+
 function renderWatch() {
   const section = document.getElementById('watchSection');
   const body = document.getElementById('watchBody');
@@ -1365,13 +1368,25 @@ function renderWatch() {
   section.style.display = '';
   const escW = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fmtW = v => (v === null || v === undefined) ? '—' : v;
-  body.innerHTML = WATCH_ROWS.map((w, wi) => {
+  // 排序后的行
+  let rows = WATCH_ROWS;
+  if (watchSortCol) {
+    rows = [...WATCH_ROWS].sort((a, b) => {
+      let va = a[watchSortCol], vb = b[watchSortCol];
+      if (typeof va === 'string') return watchSortAsc ? va.localeCompare(vb, 'zh') : vb.localeCompare(va, 'zh');
+      if (va === null || va === undefined) return 1;
+      if (vb === null || vb === undefined) return -1;
+      return watchSortAsc ? va - vb : vb - va;
+    });
+  }
+  body.innerHTML = rows.map((w, wi) => {
     // 相对当天最大消耗缩放，最大柱满高；无消耗天保留可见轨道
     const maxS = Math.max(...w.trail.map(t => t.s), 0.01);
     const bars = w.trail.map((t, ti) => {
       const active = t.s > 0;
       const h = active ? Math.max(8, Math.min(100, t.s / maxS * 100)) : 3;
-      return `<div class="watch-bar ${active ? 'has' : ''}" data-w="${wi}" data-t="${ti}" style="height:${h}%">${t.g > 0 ? '<span class="watch-dot"></span>' : ''}</div>`;
+      const wi0 = WATCH_ROWS.indexOf(w);
+      return `<div class="watch-bar ${active ? 'has' : ''}" data-w="${wi0}" data-t="${ti}" style="height:${h}%">${t.g > 0 ? '<span class="watch-dot"></span>' : ''}</div>`;
     }).join('');
     const trailLabels = w.trail.length
       ? `<div class="watch-trail-labels"><span>${w.trail[0].d.slice(3)}</span><span>${w.trail[Math.floor(w.trail.length / 2)].d.slice(3)}</span><span>${w.trail[w.trail.length - 1].d.slice(3)}</span></div>`
@@ -1428,6 +1443,31 @@ function renderWatch() {
     });
     bar.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
   });
+
+  // 表头点击排序（轨迹列不排）
+  const thead = document.querySelector('#watchTable thead');
+  if (thead && !thead.dataset.bound) {
+    thead.dataset.bound = '1';
+    thead.querySelectorAll('th[data-col]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.onclick = () => {
+        const col = th.dataset.col;
+        if (watchSortCol === col) {
+          watchSortAsc = !watchSortAsc;
+        } else {
+          watchSortCol = col;
+          watchSortAsc = true;
+        }
+        thead.querySelectorAll('th').forEach(x => x.classList.remove('sorted-asc', 'sorted-desc'));
+        th.classList.add(watchSortAsc ? 'sorted-asc' : 'sorted-desc');
+        renderWatch();
+      };
+    });
+  } else if (thead) {
+    thead.querySelectorAll('th').forEach(th => th.classList.remove('sorted-asc', 'sorted-desc'));
+    const activeTh = thead.querySelector('th[data-col="' + watchSortCol + '"]');
+    if (activeTh) activeTh.classList.add(watchSortAsc ? 'sorted-asc' : 'sorted-desc');
+  }
 }
 
 function renderTable() {
