@@ -71,6 +71,9 @@ body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-h
 .kpi-diff{margin-right:6px;font-size:10.5px;font-weight:600;display:inline-block}
 .kpi-diff.up{color:var(--danger)}
 .kpi-diff.down{color:var(--success)}
+.tc-diff{font-weight:600;display:inline-block}
+.tc-diff.inc{color:var(--success)}
+.tc-diff.dec{color:var(--danger)}
 
 .section-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;
   display:flex;align-items:center;gap:6px}
@@ -866,12 +869,12 @@ function updateTypeCards(rows) {  const container = document.getElementById('typ
     }
   }
 
-  const diffFmt = (curVal, prevVal, digits, prefix, suffix) => {
+  const diffFmt = (label, curVal, prevVal, digits, prefix, suffix) => {
     const d = curVal - prevVal;
-    if (d === 0) return '<span class="kpi-diff">±0</span>';
+    if (d === 0) return '<span>' + label + ' ±0</span>';
     const sign = d > 0 ? '+' : '-';
-    const cls = d > 0 ? 'up' : 'down';
-    return '<span class="kpi-diff ' + cls + '">' + sign + prefix + Math.abs(d).toFixed(digits) + suffix + '</span>';
+    const cls = d > 0 ? 'inc' : 'dec';
+    return '<span>' + label + ' <span class="tc-diff ' + cls + '">' + sign + prefix + Math.abs(d).toFixed(digits) + suffix + '</span></span>';
   };
 
   const types = [
@@ -949,14 +952,14 @@ function updateTypeCards(rows) {  const container = document.getElementById('typ
         const cCpa = conv > 0 ? spend / conv : 0;
         return `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed ${t.color}44;font-size:11px;color:#64748B;line-height:1.9">
           <div style="font-weight:600;margin-bottom:2px;color:#94A3B8">较昨日</div>
-          ${diffFmt(spend, p.spend, 2, '¥', '')} 消耗　
-          ${diffFmt(imp, p.imp, 0, '', '')} 展示　
-          ${diffFmt(click, p.click, 0, '', '')} 点击<br>
-          ${diffFmt(cCtr, pCtr, 2, '', '%')} 点击率　
-          ${diffFmt(cCvr, pCvr, 2, '', '%')} 转化率　
-          ${diffFmt(conv, p.conv, 0, '', '')} 转化<br>
-          ${diffFmt(gq, p.gq, 0, '', '')} 高潜　
-          ${diffFmt(cCpa, pCpa, 2, '¥', '')} CPA
+          ${diffFmt('消耗', spend, p.spend, 2, '¥', '')}　
+          ${diffFmt('展示', imp, p.imp, 0, '', '')}　
+          ${diffFmt('点击', click, p.click, 0, '', '')}<br>
+          ${diffFmt('点击率', cCtr, pCtr, 2, '', '%')}　
+          ${diffFmt('转化率', cCvr, pCvr, 2, '', '%')}　
+          ${diffFmt('转化', conv, p.conv, 0, '', '')}<br>
+          ${diffFmt('高潜', gq, p.gq, 0, '', '')}　
+          ${diffFmt('CPA', cCpa, pCpa, 2, '¥', '')}
         </div>`;
       })() : ''}
     </div>`;
