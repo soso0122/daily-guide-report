@@ -1414,10 +1414,11 @@ function renderWatch() {
       if (!t) return;
       const ctrD = t.imp > 0 ? (t.click / t.imp * 100).toFixed(2) + '%' : '—';
       const cvrD = t.click > 0 ? (t.conv / t.click * 100).toFixed(2) + '%' : '—';
+      const cpaD = t.conv > 0 ? '¥' + (t.s / t.conv).toFixed(2) : '—';
       tip.innerHTML = '<b>' + t.d + '</b><br>' +
         '消耗 ¥' + t.s.toFixed(2) + ' · 展示 ' + t.imp.toLocaleString('zh') + '<br>' +
         '点击 ' + t.click.toLocaleString('zh') + '（CTR ' + ctrD + '）<br>' +
-        '转化 ' + t.conv + '（CVR ' + cvrD + '）' +
+        '转化 ' + t.conv + '（CVR ' + cvrD + '） · CPA ' + cpaD +
         (t.g > 0 ? '<br><span class="wt-gq">★ 高潜成交 ' + t.g + '</span>' : '');
       tip.style.display = 'block';
     });
