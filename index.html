@@ -757,6 +757,9 @@ function updatePersonCards(rows, auditData) {
       const passNames = pa.pass.length > 0
         ? pa.pass.map(n => `<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,.1)">${n}</div>`).join('')
         : '<div style="color:#94A3B8">无</div>';
+      const failNames = pa.fail.length > 0
+        ? pa.fail.map(n => `<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,.1)">${n}</div>`).join('')
+        : '<div style="color:#94A3B8">无</div>';
       auditHtml = `
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid ${color}22">
           <div style="font-size:10px;color:#94A3B8;margin-bottom:4px">${
@@ -773,10 +776,13 @@ function updatePersonCards(rows, auditData) {
           <div class="audit-tooltip-trigger" style="font-size:10px;color:#94A3B8;margin-top:3px;cursor:pointer;position:relative">
             过审 ${pa.pass.length} / 未过审 ${pa.fail.length}
             <div class="audit-tooltip" style="display:none;position:absolute;bottom:100%;left:0;z-index:100;
-              background:#1E3A8A;color:#fff;border-radius:8px;padding:10px 12px;min-width:180px;
+              background:#1E3A8A;color:#fff;border-radius:8px;padding:10px 12px;min-width:180px;max-width:320px;
+              max-height:320px;overflow-y:auto;
               font-size:11px;box-shadow:0 4px 12px rgba(0,0,0,.3);margin-bottom:4px">
-              <div style="font-weight:600;margin-bottom:6px;color:#93C5FD">✓ 过审素材</div>
+              <div style="font-weight:600;margin-bottom:6px;color:#93C5FD">✓ 过审素材（${pa.pass.length}）</div>
               ${passNames}
+              <div style="font-weight:600;margin:8px 0 6px;color:#FCA5A5">✗ 未过审素材（${pa.fail.length}）</div>
+              ${failNames}
             </div>
           </div>
         </div>`;
