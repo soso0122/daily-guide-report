@@ -183,10 +183,11 @@ tbody tr:last-child{border-bottom:none}
 .watch-status.active{background:#ECFDF5;color:#059669}
 .watch-status.stopped{background:#FEF2F2;color:#DC2626}
 .watch-status.none{background:#F8FAFC;color:#94A3B8}
-.watch-trail{display:flex;gap:2px;align-items:flex-end;height:34px;min-width:140px}
-.watch-bar{flex:1;min-width:4px;border-radius:2px 2px 0 0;background:#DBEAFE;position:relative}
+.watch-trail{display:flex;gap:2px;align-items:flex-end;height:44px;min-width:150px}
+.watch-bar{flex:1;min-width:5px;border-radius:2px 2px 0 0;background:#E2E8F0;position:relative}
 .watch-bar.has{background:#3B82F6}
-.watch-dot{position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;background:#D97706}
+.watch-dot{position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:#D97706}
+.watch-trail-labels{display:flex;justify-content:space-between;font-size:9px;color:#94A3B8;margin-top:2px;min-width:150px}
 .mat-name{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-size:12px;color:var(--text)}
 .num{font-family:'Fira Code',monospace;font-size:12px}
@@ -1362,11 +1363,16 @@ function renderWatch() {
   const escW = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fmtW = v => (v === null || v === undefined) ? '—' : v;
   body.innerHTML = WATCH_ROWS.map(w => {
+    // 相对当天最大消耗缩放，最大柱满高；无消耗天保留可见轨道
+    const maxS = Math.max(...w.trail.map(t => t.s), 0.01);
     const bars = w.trail.map(t => {
       const active = t.s > 0;
-      const h = active ? Math.max(6, Math.min(100, t.s / 15)) : 3;
+      const h = active ? Math.max(8, Math.min(100, t.s / maxS * 100)) : 3;
       return `<div class="watch-bar ${active ? 'has' : ''}" title="${t.d} ¥${t.s}${t.g > 0 ? ' · 高潜' + t.g : ''}" style="height:${h}%">${t.g > 0 ? '<span class="watch-dot"></span>' : ''}</div>`;
     }).join('');
+    const trailLabels = w.trail.length
+      ? `<div class="watch-trail-labels"><span>${w.trail[0].d.slice(3)}</span><span>${w.trail[Math.floor(w.trail.length / 2)].d.slice(3)}</span><span>${w.trail[w.trail.length - 1].d.slice(3)}</span></div>`
+      : '';
     const ctr = w.ctr !== null ? w.ctr.toFixed(2) + '%' : '—';
     const cvr = w.cvr !== null ? w.cvr.toFixed(2) + '%' : '—';
     const deep = w.deep_rate !== null ? w.deep_rate.toFixed(1) + '%' : '—';
@@ -1385,7 +1391,7 @@ function renderWatch() {
       <td class="num" style="color:#8B5CF6">${cvr}</td>
       <td class="num ${w.gq > 0 ? 'warn' : ''}">${w.gq}</td>
       <td class="num warn">${deep}</td>
-      <td><div class="watch-trail">${bars}</div></td>
+      <td><div class="watch-trail">${bars}</div>${trailLabels}</td>
     </tr>`;
   }).join('');
 }
