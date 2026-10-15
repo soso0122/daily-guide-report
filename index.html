@@ -357,6 +357,14 @@ video{max-width:100%;max-height:65vh;display:block}
     </div>
   </div>
 
+  <!-- 多日趋势折线图（仅多日时显示） -->
+  <div id="trendSection" style="display:none;margin-bottom:20px">
+    <div class="chart-card">
+      <div class="section-title">每日趋势：转化数 / 高潜成交 / CPA（近30天）</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="chartTrend"></canvas></div>
+    </div>
+  </div>
+
   <!-- 多日切换标签（仅多日时显示） -->
   <div id="tabsContainer" style="display:none;margin-bottom:16px">
     <div id="rangeBtns" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
@@ -535,6 +543,83 @@ const chartDefaults = {
 };
 
 let trendChart;
+
+function initTrendChart() {
+  if (!IS_MULTI) return;
+  const trend = (COMPARE_DATA.trend || []).slice(-30);
+  const labels      = trend.map(t => t.date);
+  const convData    = trend.map(t => t.conv);
+  const gqData      = trend.map(t => t.gaoquan);
+  const cpaData     = trend.map(t => t.cpa);
+  const deepRateData= trend.map(t => t.conv > 0 ? parseFloat((t.gaoquan / t.conv * 100).toFixed(1)) : 0);
+
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('chartTrend'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '转化数', data: convData, yAxisID: 'y',
+          borderColor: '#3B82F6', backgroundColor: '#3B82F620',
+          borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+          fill: true, tension: 0.3,
+        },
+        {
+          label: '高潜成交', data: gqData, yAxisID: 'y',
+          borderColor: '#D97706', backgroundColor: '#D9770620',
+          borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+          fill: true, tension: 0.3,
+        },
+        {
+          label: 'CPA(¥)', data: cpaData, yAxisID: 'yRight',
+          borderColor: '#10B981', backgroundColor: 'transparent',
+          borderWidth: 2, borderDash: [4, 3],
+          pointRadius: 4, pointHoverRadius: 6,
+          fill: false, tension: 0.3,
+        },
+        {
+          label: '深转率(%)', data: deepRateData, yAxisID: 'yRight',
+          borderColor: '#8B5CF6', backgroundColor: 'transparent',
+          borderWidth: 2, borderDash: [2, 4],
+          pointRadius: 4, pointHoverRadius: 6,
+          fill: false, tension: 0.3,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top',
+          labels: { font: { size: 11 }, boxWidth: 12, padding: 12 } },
+        tooltip: { callbacks: {
+          label: ctx => {
+            if (ctx.dataset.label === 'CPA(¥)') return ' CPA: ¥' + ctx.parsed.y.toFixed(2);
+            if (ctx.dataset.label === '深转率(%)') return ' 深转率: ' + ctx.parsed.y.toFixed(1) + '%';
+            return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(0);
+          }
+        } }
+      },
+      scales: {
+        x: { grid: { color: '#F1F5F9' }, ticks: { font: { size: 11 } } },
+        y: {
+          position: 'left', grid: { color: '#F1F5F9' },
+          ticks: { font: { size: 11 }, stepSize: 1 },
+          title: { display: true, text: '次数', font: { size: 10 }, color: '#94A3B8' }
+        },
+        yRight: {
+          position: 'right', grid: { drawOnChartArea: false },
+          ticks: { font: { size: 11 }, callback: v => v },
+          title: { display: true, text: 'CPA(¥) / 深转率(%)', font: { size: 10 }, color: '#94A3B8' }
+        }
+      }
+    }
+  });
+}
+
+let spendChart, cpaChart, convChart, gaoquanChart;
+let tagSpendChart, tagConvChart, tagGaoquanChart, auditChart;
 
 function updateTagCards(rows) {  const container = document.getElementById('tagCardsRow');
   if (!container) return;
@@ -1748,6 +1833,8 @@ document.addEventListener('DOMContentLoaded', function() {
       updateAuditCards(AUDIT_DATA);
     } else {
       document.getElementById('tabsContainer').style.display = '';
+      document.getElementById('trendSection').style.display = '';
+      if (typeof Chart !== 'undefined') initTrendChart();
       initTabs();
     }
   }
