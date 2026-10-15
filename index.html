@@ -148,6 +148,11 @@ body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-h
 }
 .table-info{font-size:12px;color:var(--text-secondary)}
 .table-info span{font-weight:600;color:var(--primary)}
+.page-btn{display:inline-block;margin:0 2px;padding:1px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:11px;color:var(--text-secondary);cursor:pointer}
+.page-btn:hover{border-color:var(--primary-light);color:var(--primary)}
+.page-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.page-btn:disabled{opacity:.4;cursor:default}
+.page-ellipsis{margin:0 2px;font-size:11px;color:var(--text-muted)}
 .table-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
 thead th{
@@ -352,14 +357,6 @@ video{max-width:100%;max-height:65vh;display:block}
     </div>
   </div>
 
-  <!-- 多日趋势折线图（仅多日时显示） -->
-  <div id="trendSection" style="display:none;margin-bottom:20px">
-    <div class="chart-card">
-      <div class="section-title">每日趋势：转化数 / 高潜成交 / CPA（近30天）</div>
-      <div class="chart-wrap" style="height:200px"><canvas id="chartTrend"></canvas></div>
-    </div>
-  </div>
-
   <!-- 多日切换标签（仅多日时显示） -->
   <div id="tabsContainer" style="display:none;margin-bottom:16px">
     <div id="rangeBtns" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
@@ -458,7 +455,7 @@ video{max-width:100%;max-height:65vh;display:block}
   <div class="table-card">
     <div class="table-toolbar">
       <div class="section-title" style="margin:0">素材明细</div>
-      <div class="table-info">显示 <span id="visibleCount">-</span> / 1930 条 · 点击列头排序</div>
+      <div class="table-info">显示 <span id="visibleCount">-</span> / 1930 条 · 点击列头排序 · <span id="pagerBox"></span></div>
     </div>
     <div class="table-wrap">
       <table id="matTable">
@@ -485,25 +482,6 @@ video{max-width:100%;max-height:65vh;display:block}
       </table>
     </div>
     <div class="empty-state" id="emptyState" style="display:none">该筛选条件下暂无数据</div>
-  </div>
-
-  <!-- 多日对比表（仅多日时显示） -->
-  <div id="compareSection" style="display:none;margin-top:20px">
-    <div class="table-card">
-      <div class="table-toolbar">
-        <div class="section-title" style="margin:0">多日趋势对比</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div id="compareColBtns" style="display:flex;gap:4px"></div>
-          <button class="sort-btn active" id="compareSortBtn" onclick="toggleCompareSort()" style="margin-left:4px">总消耗 ↓</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="compare-table">
-          <thead id="compareHead"></thead>
-          <tbody id="compareBody"></tbody>
-        </table>
-      </div>
-    </div>
   </div>
 
 </div><!-- /page -->
@@ -550,87 +528,6 @@ const chartDefaults = {
 };
 
 let trendChart;
-
-function initTrendChart() {
-  if (!IS_MULTI) return;
-  const trend = (COMPARE_DATA.trend || []).slice(-30);
-  const labels      = trend.map(t => t.date);
-  const convData    = trend.map(t => t.conv);
-  const gqData      = trend.map(t => t.gaoquan);
-  const cpaData     = trend.map(t => t.cpa);
-  const deepRateData= trend.map(t => t.conv > 0 ? parseFloat((t.gaoquan / t.conv * 100).toFixed(1)) : 0);
-
-  if (trendChart) trendChart.destroy();
-  trendChart = new Chart(document.getElementById('chartTrend'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: '转化数', data: convData, yAxisID: 'y',
-          borderColor: '#3B82F6', backgroundColor: '#3B82F620',
-          borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
-          fill: true, tension: 0.3,
-        },
-        {
-          label: '高潜成交', data: gqData, yAxisID: 'y',
-          borderColor: '#D97706', backgroundColor: '#D9770620',
-          borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
-          fill: true, tension: 0.3,
-        },
-        {
-          label: 'CPA(¥)', data: cpaData, yAxisID: 'yRight',
-          borderColor: '#10B981', backgroundColor: 'transparent',
-          borderWidth: 2, borderDash: [4, 3],
-          pointRadius: 4, pointHoverRadius: 6,
-          fill: false, tension: 0.3,
-        },
-        {
-          label: '深转率(%)', data: deepRateData, yAxisID: 'yRight',
-          borderColor: '#8B5CF6', backgroundColor: 'transparent',
-          borderWidth: 2, borderDash: [2, 4],
-          pointRadius: 4, pointHoverRadius: 6,
-          fill: false, tension: 0.3,
-        },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: true, position: 'top',
-          labels: { font: { size: 11 }, boxWidth: 12, padding: 12 } },
-        tooltip: { callbacks: {
-          label: ctx => {
-            if (ctx.dataset.label === 'CPA(¥)') return ' CPA: ¥' + ctx.parsed.y.toFixed(2);
-            if (ctx.dataset.label === '深转率(%)') return ' 深转率: ' + ctx.parsed.y.toFixed(1) + '%';
-            return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(0);
-          }
-        } }
-      },
-      scales: {
-        x: { grid: { color: '#F1F5F9' }, ticks: { font: { size: 11 } } },
-        y: {
-          position: 'left', grid: { color: '#F1F5F9' },
-          ticks: { font: { size: 11 }, stepSize: 1 },
-          title: { display: true, text: '次数', font: { size: 10 }, color: '#94A3B8' }
-        },
-        yRight: {
-          position: 'right', grid: { drawOnChartArea: false },
-          ticks: { font: { size: 11 }, callback: v => v },
-          title: { display: true, text: 'CPA(¥) / 深转率(%)', font: { size: 10 }, color: '#94A3B8' }
-        }
-      }
-    }
-  });
-}
-
-let spendChart, cpaChart, convChart, gaoquanChart;
-let tagSpendChart, tagConvChart, tagGaoquanChart, auditChart;
-
-function initTagCharts() {
-  updateTagCards(ALL_ROWS);
-}
 
 function updateTagCards(rows) {  const container = document.getElementById('tagCardsRow');
   if (!container) return;
@@ -705,6 +602,7 @@ function updateTagCards(rows) {  const container = document.getElementById('tagC
     </div>`;
   }).join('');
 }
+
 
 function initAuditChart() {
   updateAuditCards(AUDIT_DATA);
@@ -1210,6 +1108,7 @@ function renderDay(rows, dateLabel) {
   currentAccountFilter = 'all';
   // 更新表格数据源
   window.currentRows = rows;
+  pageNum = 1;
   renderTable();
 
   // 更新图表
@@ -1237,6 +1136,8 @@ let currentVersion = 'all';
 let currentAccountFilter = 'all';
 let sortCol = 'spend';
 let sortAsc = false;
+let pageNum = 1;         // 当前页（1起）
+const PAGE_SIZE = 20;    // 每页行数
 
 function filterTag(tag, btn) {
   currentTag = tag;
@@ -1248,6 +1149,7 @@ function filterTag(tag, btn) {
   btn.classList.add('active');
   if (tag !== 'all') { btn.style.background = TAG_COLORS[tag]||'#64748B'; btn.style.color='#fff'; }
   else { btn.style.background='var(--primary)'; btn.style.color='#fff'; }
+  pageNum = 1;
   renderTable();
 }
 
@@ -1258,6 +1160,7 @@ function filterVersion(ver, btn) {
   });
   btn.classList.add('active');
   btn.style.background = 'var(--primary)'; btn.style.color = '#fff';
+  pageNum = 1;
   renderTable();
 }
 
@@ -1277,6 +1180,7 @@ function filterType(type, btn) {
     btn.style.background = 'var(--primary)';
     btn.style.color = '#fff';
   }
+  pageNum = 1;
   renderTable();
 }
 
@@ -1295,6 +1199,7 @@ function filterBy(person, btn) {
     btn.style.background = 'var(--primary)';
     btn.style.color = '#fff';
   }
+  pageNum = 1;
   renderTable();
 }
 
@@ -1308,6 +1213,7 @@ function filterAccount(account, btn) {
   btn.classList.add('active');
   btn.style.background = account === 'all' ? 'var(--primary)' : '#475569';
   btn.style.color = '#fff';
+  pageNum = 1;
   renderTable();
 }
 
@@ -1318,6 +1224,7 @@ document.querySelectorAll('thead th[data-col]').forEach(th => {
     else { sortCol = col; sortAsc = col === 'name' || col === 'person'; }
     document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted-asc','sorted-desc'));
     this.classList.add(sortAsc ? 'sorted-asc' : 'sorted-desc');
+    pageNum = 1;
     renderTable();
   };
 });
@@ -1381,6 +1288,34 @@ function renderChannel(dates) {
   }).join('');
 }
 
+function renderPager(totalPages) {
+  const box = document.getElementById('pagerBox');
+  if (!box) return;
+  if (totalPages <= 1) { box.innerHTML = ''; return; }
+  let html = '';
+  const mk = (label, page, disabled, active) =>
+    `<button class="page-btn${active ? ' active' : ''}" data-page="${page}"${disabled ? ' disabled' : ''}>${label}</button>`;
+  // 页码窗口：当前页前后各2页，加首末页
+  const pages = new Set([1, totalPages, pageNum - 2, pageNum - 1, pageNum, pageNum + 1, pageNum + 2]);
+  const sorted = [...pages].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+  html += mk('‹', pageNum - 1, pageNum <= 1, false);
+  let prev = 0;
+  sorted.forEach(p => {
+    if (prev && p - prev > 1) html += '<span class="page-ellipsis">…</span>';
+    html += mk(p, p, false, p === pageNum);
+    prev = p;
+  });
+  html += mk('›', pageNum + 1, pageNum >= totalPages, false);
+  box.innerHTML = html;
+  box.querySelectorAll('.page-btn').forEach(btn => {
+    btn.onclick = () => {
+      if (btn.disabled) return;
+      pageNum = +btn.dataset.page;
+      renderTable();
+    };
+  });
+}
+
 function renderTable() {
   const rows = window.currentRows || ALL_ROWS;
   const filtered = (currentFilter === 'all' ? rows : rows.filter(r => r.person === currentFilter))
@@ -1396,13 +1331,17 @@ function renderTable() {
       (r.tag && r.tag.split(',').some(t => t.split('-')[0].trim() === currentTag)))
     .filter(r => currentVersion === 'all' ? true : r.version === currentVersion);
   const sorted = sortRows(filtered);
-  const MAX_ROWS = 3000;  // 上限：防止全年/整月视图渲染过多行导致卡顿
-  const capped = sorted.length > MAX_ROWS;
-  const shown = capped ? sorted.slice(0, MAX_ROWS) : sorted;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  if (pageNum > totalPages) pageNum = totalPages;
+  const start = (pageNum - 1) * PAGE_SIZE;
+  const shown = sorted.slice(start, start + PAGE_SIZE);
   const tbody = document.getElementById('tableBody');
   const empty = document.getElementById('emptyState');
   document.getElementById('visibleCount').textContent =
-    (capped ? '前' + MAX_ROWS + ' / ' : '') + sorted.length;
+    sorted.length + ' 条 · 第 ' + pageNum + '/' + totalPages + ' 页';
+
+  // 分页控件
+  renderPager(totalPages);
 
   if (!sorted.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
   empty.style.display = 'none';
@@ -1629,7 +1568,6 @@ function initTabs() {
     const rows = mergedRows(dates);
     renderDay(rows, dates.join('+'));
     renderChannel(dates);
-    renderCompare();
     updateTagCards(rows);
     updateTypeCards(rows);
     updatePersonCards(rows, mergeAuditData(dates));
@@ -1790,128 +1728,6 @@ function initTabs() {
 }
 
 // ---------- 对比表 ----------
-let compareSortAsc = false;
-let compareActiveDates = null;  // null = 全部日期
-
-function toggleCompareSort() {
-  compareSortAsc = !compareSortAsc;
-  document.getElementById('compareSortBtn').textContent = '总消耗 ' + (compareSortAsc ? '↑' : '↓');
-  renderCompare();
-}
-
-function initCompareCols() {
-  const dates = ALL_DATES;
-  // 默认只展示最近7天
-  compareActiveDates = dates.slice(-7);
-  const container = document.getElementById('compareColBtns');
-
-  function rebuild() {
-    container.innerHTML = '';
-    if (dates.length <= 7) {
-      dates.forEach(d => {
-        const btn = document.createElement('button');
-        const isActive = compareActiveDates.includes(d);
-        btn.className = 'sort-btn' + (isActive ? ' active' : '');
-        btn.textContent = d;
-        btn.onclick = () => {
-          if (compareActiveDates.includes(d)) {
-            if (compareActiveDates.length === 1) return;
-            compareActiveDates = compareActiveDates.filter(x => x !== d);
-          } else {
-            compareActiveDates = dates.filter(x => compareActiveDates.includes(x) || x === d);
-          }
-          rebuild();
-          renderCompare();
-        };
-        container.appendChild(btn);
-      });
-    } else {
-      // 超过7天：显示最近7天的胶囊按钮 + "更多"展开其余
-      const recentDates = dates.slice(-7);
-      const olderDates  = dates.slice(0, -7);
-
-      // 先渲染最近7天按钮
-      recentDates.forEach(d => {
-        const btn = document.createElement('button');
-        const isActive = compareActiveDates.includes(d);
-        btn.className = 'sort-btn' + (isActive ? ' active' : '');
-        btn.textContent = d;
-        btn.onclick = () => {
-          if (compareActiveDates.includes(d)) {
-            if (compareActiveDates.length === 1) return;
-            compareActiveDates = compareActiveDates.filter(x => x !== d);
-          } else {
-            compareActiveDates = dates.filter(x => compareActiveDates.includes(x) || x === d);
-          }
-          rebuild();
-          renderCompare();
-        };
-        container.appendChild(btn);
-      });
-
-      // 历史日期用下拉
-      if (olderDates.length > 0) {
-        const sep = document.createElement('span');
-        sep.style.cssText = 'width:1px;height:18px;background:var(--border);margin:0 4px;display:inline-block';
-        container.appendChild(sep);
-
-        const sel = document.createElement('select');
-        sel.className = 'tab-select';
-        sel.style.cssText = 'padding:3px 8px;font-size:11px;min-width:90px';
-        const placeholder = document.createElement('option');
-        placeholder.value = ''; placeholder.textContent = '历史日期...';
-        placeholder.disabled = true; placeholder.selected = true;
-        sel.appendChild(placeholder);
-        olderDates.forEach(d => {
-          const opt = document.createElement('option');
-          opt.value = d;
-          opt.textContent = d + (compareActiveDates.includes(d) ? ' ✓' : '');
-          sel.appendChild(opt);
-        });
-        sel.onchange = () => {
-          const d = sel.value;
-          if (!d) return;
-          if (compareActiveDates.includes(d)) {
-            if (compareActiveDates.length === 1) return;
-            compareActiveDates = compareActiveDates.filter(x => x !== d);
-          } else {
-            compareActiveDates = dates.filter(x => compareActiveDates.includes(x) || x === d);
-          }
-          sel.value = '';
-          rebuild();
-          renderCompare();
-        };
-        container.appendChild(sel);
-      }
-    }
-  }
-  rebuild();
-}
-
-function renderCompare() {
-  if (!IS_MULTI) return;
-  const head = document.getElementById('compareHead');
-  const body = document.getElementById('compareBody');
-  const dates = compareActiveDates || ALL_DATES;
-  head.innerHTML = `<tr><th>素材名称</th>${dates.map(d => `<th>${d}</th>`).join('')}<th style="cursor:pointer" onclick="toggleCompareSort()">总消耗 ${compareSortAsc?'↑':'↓'}</th></tr>`;
-  let matRows = (COMPARE_DATA.mat_rows || []).filter(m =>
-    ALL_DATES.some(d => (m['s_'+d] || 0) > 0)
-  );
-  // 按当前可见日期重算总消耗再排序
-  matRows = matRows.map(m => ({
-    ...m,
-    _visTotal: dates.reduce((s, d) => s + (m['s_'+d] || 0), 0)
-  })).sort((a, b) => compareSortAsc ? a._visTotal - b._visTotal : b._visTotal - a._visTotal);
-
-  body.innerHTML = matRows.map(m => `
-    <tr>
-      <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.name}">${m.name}</td>
-      ${dates.map(d => `<td><span class="num">${(m['s_'+d]||0)>0 ? '¥'+(m['s_'+d]).toFixed(2) : '<span class=\"num-zero\">—</span>'}</span></td>`).join('')}
-      <td><strong>¥${m._visTotal.toFixed(2)}</strong></td>
-    </tr>
-  `).join('') || '<tr><td colspan="' + (dates.length+2) + '" class="empty-state">暂无数据</td></tr>';
-}
-
 // ---------- 初始化 ----------
 document.addEventListener('DOMContentLoaded', function() {
   // 等 Chart.js 加载完再初始化
@@ -1925,10 +1741,6 @@ document.addEventListener('DOMContentLoaded', function() {
       updateAuditCards(AUDIT_DATA);
     } else {
       document.getElementById('tabsContainer').style.display = '';
-      document.getElementById('compareSection').style.display = '';
-      document.getElementById('trendSection').style.display = '';
-      if (typeof Chart !== 'undefined') initTrendChart();
-      initCompareCols();
       initTabs();
     }
   }
