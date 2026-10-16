@@ -490,10 +490,20 @@ document.addEventListener('mouseover', e => {
   tip.style.display = 'block';
 });
 document.addEventListener('mousemove', e => {
-  if (tip.style.display === 'block') {
-    tip.style.left = (e.pageX + 14) + 'px';
-    tip.style.top = (e.pageY + 14) + 'px';
-  }
+  if (tip.style.display !== 'block') return;
+  // 先放鼠标右下，测量后越界则翻转到鼠标左上，保证始终完整可见
+  let x = e.clientX + 14;
+  let y = e.clientY + 14;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+  const r = tip.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (r.right > vw - 4) x = e.clientX - r.width - 14;
+  if (r.bottom > vh - 4) y = e.clientY - r.height - 14;
+  if (x < 4) x = 4;
+  if (y < 4) y = 4;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
 });
 
 renderPeriods();
