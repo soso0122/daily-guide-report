@@ -414,7 +414,15 @@ video{max-width:100%;max-height:65vh;display:block}
         <div class="table-wrap" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
           <table style="font-size:12px">
             <thead><tr>
-              <th>推送日</th><th>推送数</th><th>卡审数</th><th>总卡审率</th><th>0改</th><th>1改</th><th>2改</th><th>3改</th>
+              <th>推送日</th>
+              <th style="text-align:center">推送数</th>
+              <th style="text-align:center">卡审数</th>
+              <th style="text-align:center">总卡审率</th>
+              <th style="text-align:center">环比昨日</th>
+              <th style="text-align:center">0改</th>
+              <th style="text-align:center">1改</th>
+              <th style="text-align:center">2改</th>
+              <th style="text-align:center">3改</th>
             </tr></thead>
             <tbody id="rejectBucketBody"></tbody>
           </table>
@@ -428,7 +436,15 @@ video{max-width:100%;max-height:65vh;display:block}
         <div class="table-wrap" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
           <table style="font-size:12px">
             <thead><tr>
-              <th>推送周</th><th>推送数</th><th>卡审数</th><th>总卡审率</th><th>环比上周</th><th>0改</th><th>1改</th><th>2改</th><th>3改</th>
+              <th>推送周</th>
+              <th style="text-align:center">推送数</th>
+              <th style="text-align:center">卡审数</th>
+              <th style="text-align:center">总卡审率</th>
+              <th style="text-align:center">环比上周</th>
+              <th style="text-align:center">0改</th>
+              <th style="text-align:center">1改</th>
+              <th style="text-align:center">2改</th>
+              <th style="text-align:center">3改</th>
             </tr></thead>
             <tbody id="rejectWeekBody"></tbody>
           </table>
@@ -1175,8 +1191,19 @@ function setRejFilter(filter, btn) {
   renderRejectList();
 }
 
-function rejectRowHtml(key, row, isDay) {
+function rejectRowHtml(key, row, isDay, prevRow) {
   const all = row['全部'] || {pushed:0,rejected:0,reject_rate:0};
+  // 环比昨日：总卡审率与前一个推送日的差值（加减法）
+  let momHtml = '<span style="color:var(--text-muted)">—</span>';
+  if (isDay && prevRow) {
+    const prevAll = prevRow['全部'] || {pushed:0,rejected:0,reject_rate:0};
+    if (prevAll.pushed > 0) {
+      const diff = all.reject_rate - prevAll.reject_rate;
+      if (Math.abs(diff) < 0.05) momHtml = '<span style="color:#64748B">持平</span>';
+      else if (diff > 0) momHtml = '<span style="color:#DC2626;font-weight:600">↑' + diff.toFixed(1) + 'pp</span>';
+      else momHtml = '<span style="color:#059669;font-weight:600">↓' + Math.abs(diff).toFixed(1) + 'pp</span>';
+    }
+  }
   const cells = ['0改','1改','2改','3改'].map(v => {
     const b = row[v] || {pushed:0,rejected:0,reject_rate:0};
     return b.pushed > 0
@@ -1185,9 +1212,10 @@ function rejectRowHtml(key, row, isDay) {
   }).join('');
   return `<tr>
     <td style="font-weight:600">${isDay ? fmtDate(key) : key}</td>
-    <td>${all.pushed}</td>
-    <td style="color:#DC2626;font-weight:600">${all.rejected}</td>
-    <td style="font-family:monospace">${all.reject_rate}%</td>
+    <td style="text-align:center">${all.pushed}</td>
+    <td style="color:#DC2626;font-weight:600;text-align:center">${all.rejected}</td>
+    <td style="font-family:monospace;text-align:center">${all.reject_rate}%</td>
+    ${isDay ? `<td style="text-align:center">${momHtml}</td>` : ''}
     ${cells}
   </tr>`;
 }
@@ -1195,12 +1223,17 @@ function rejectRowHtml(key, row, isDay) {
 function renderRejectBucketTable() {
   const tbody = document.getElementById('rejectBucketBody');
   const views = REJECT_ANALYSIS.views || {};
-  // 分日明细：只显示顶部选中的日期
+  // 分日明细：只显示顶部选中的日期；环比基准取全量日序列的前一天
   if (tbody) {
     const d = views.day || {};
+    const dayKeys = Object.keys(d).sort();
     const keys = REJ_DATES.map(labelToKey).filter(k => d[k]);
-    tbody.innerHTML = keys.map(k => rejectRowHtml(k, d[k], true)).join('') ||
-      '<tr><td colspan="8" style="color:#94A3B8;text-align:center;padding:10px">选中日期无推送数据</td></tr>';
+    tbody.innerHTML = keys.map(k => {
+      const idx = dayKeys.indexOf(k);
+      const prevRow = idx > 0 ? d[dayKeys[idx - 1]] : null;
+      return rejectRowHtml(k, d[k], true, prevRow);
+    }).join('') ||
+      '<tr><td colspan="9" style="color:#94A3B8;text-align:center;padding:10px">选中日期无推送数据</td></tr>';
   }
   renderRejectWeekTable();
 }
@@ -1257,10 +1290,10 @@ function renderRejectWeekTable() {
     }).join('');
     return `<tr>
       <td style="font-weight:600">${k}</td>
-      <td>${all.pushed}</td>
-      <td style="color:#DC2626;font-weight:600">${all.rejected}</td>
-      <td style="font-family:monospace">${all.reject_rate}%</td>
-      <td>${momHtml}</td>
+      <td style="text-align:center">${all.pushed}</td>
+      <td style="color:#DC2626;font-weight:600;text-align:center">${all.rejected}</td>
+      <td style="font-family:monospace;text-align:center">${all.reject_rate}%</td>
+      <td style="text-align:center">${momHtml}</td>
       ${cells}
     </tr>`;
   }).join('');
