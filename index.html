@@ -1234,14 +1234,14 @@ function setupModeUI() {
   const dayHead = document.getElementById('rejectDayHead');
   if (dayHead) {
     dayHead.innerHTML = isTest
-      ? `<tr><th>提交日</th><th style="text-align:center">提交数</th><th style="text-align:center">不通过</th><th style="text-align:center">不通过率</th><th style="text-align:center">环比昨日</th><th style="text-align:center">0改</th><th style="text-align:center">1改</th><th style="text-align:center">2改</th><th style="text-align:center">3改</th></tr>`
-      : `<tr><th>推送日</th><th style="text-align:center">推送数</th><th style="text-align:center">卡审数</th><th style="text-align:center">总卡审率</th><th style="text-align:center">环比昨日</th><th style="text-align:center">0改</th><th style="text-align:center">1改</th><th style="text-align:center">2改</th><th style="text-align:center">3改</th></tr>`;
+      ? `<tr><th>提交日</th><th style="text-align:center">提交数</th><th style="text-align:center">通过数</th><th style="text-align:center">通过率</th><th style="text-align:center">环比昨日</th><th style="text-align:center">0改</th><th style="text-align:center">1改</th><th style="text-align:center">2改</th><th style="text-align:center">3改</th></tr>`
+      : `<tr><th>推送日</th><th style="text-align:center">推送数</th><th style="text-align:center">通过数</th><th style="text-align:center">通过率</th><th style="text-align:center">环比昨日</th><th style="text-align:center">0改</th><th style="text-align:center">1改</th><th style="text-align:center">2改</th><th style="text-align:center">3改</th></tr>`;
   }
   const weekHead = document.getElementById('rejectWeekHead');
   if (weekHead) {
     weekHead.innerHTML = isTest
-      ? `<tr><th>提交周</th><th style="text-align:center">提交数</th><th style="text-align:center">不通过</th><th style="text-align:center">不通过率</th><th style="text-align:center">环比上周</th><th style="text-align:center">0改</th><th style="text-align:center">1改</th><th style="text-align:center">2改</th><th style="text-align:center">3改</th></tr>`
-      : `<tr><th>推送周</th><th style="text-align:center">推送数</th><th style="text-align:center">卡审数</th><th style="text-align:center">总卡审率</th><th style="text-align:center">环比上周</th><th style="text-align:center">0改</th><th style="text-align:center">1改</th><th style="text-align:center">2改</th><th style="text-align:center">3改</th></tr>`;
+      ? `<tr><th>提交周</th><th style="text-align:center">提交数</th><th style="text-align:center">通过数</th><th style="text-align:center">通过率</th><th style="text-align:center">环比上周</th><th style="text-align:center">0改</th><th style="text-align:center">1改</th><th style="text-align:center">2改</th><th style="text-align:center">3改</th></tr>`
+      : `<tr><th>推送周</th><th style="text-align:center">推送数</th><th style="text-align:center">通过数</th><th style="text-align:center">通过率</th><th style="text-align:center">环比上周</th><th style="text-align:center">0改</th><th style="text-align:center">1改</th><th style="text-align:center">2改</th><th style="text-align:center">3改</th></tr>`;
   }
   const listHead = document.getElementById('rejectListHead');
   if (listHead) {
@@ -1260,29 +1260,32 @@ function setRejFilter(filter, btn) {
 }
 
 function rejectRowHtml(key, row, isDay, prevRow) {
-  const all = row['全部'] || {pushed:0,rejected:0,reject_rate:0};
-  // 环比昨日：总卡审率与前一个推送日的差值（加减法）
+  const all = row['全部'] || {pushed:0,rejected:0,reject_rate:0,ok:0};
+  const okCount = all.ok || 0;
+  const okRate = all.pushed > 0 ? Math.round(okCount/all.pushed*1000)/10 : 0;
+  // 环比昨日：通过率与前一个推送日的差值（加减法）
   let momHtml = '<span style="color:var(--text-muted)">—</span>';
   if (isDay && prevRow) {
-    const prevAll = prevRow['全部'] || {pushed:0,rejected:0,reject_rate:0};
+    const prevAll = prevRow['全部'] || {pushed:0,ok:0};
     if (prevAll.pushed > 0) {
-      const diff = all.reject_rate - prevAll.reject_rate;
+      const prevOkRate = Math.round(prevAll.ok/prevAll.pushed*1000)/10;
+      const diff = okRate - prevOkRate;
       if (Math.abs(diff) < 0.05) momHtml = '<span style="color:#64748B">持平</span>';
-      else if (diff > 0) momHtml = '<span style="color:#DC2626;font-weight:600">↑' + diff.toFixed(1) + 'pp</span>';
-      else momHtml = '<span style="color:#059669;font-weight:600">↓' + Math.abs(diff).toFixed(1) + 'pp</span>';
+      else if (diff > 0) momHtml = '<span style="color:#059669;font-weight:600">↑' + diff.toFixed(1) + 'pp</span>';
+      else momHtml = '<span style="color:#DC2626;font-weight:600">↓' + Math.abs(diff).toFixed(1) + 'pp</span>';
     }
   }
   const cells = ['0改','1改','2改','3改'].map(v => {
-    const b = row[v] || {pushed:0,rejected:0,reject_rate:0};
-    return b.pushed > 0
-      ? `<td style="font-family:monospace;text-align:center">${b.rejected}/${b.pushed}<br><span style="color:${b.reject_rate >= 40 ? '#DC2626' : b.reject_rate >= 20 ? '#D97706' : '#059669'};font-size:10px">${b.reject_rate}%</span></td>`
-      : '<td style="text-align:center;color:var(--text-muted)">—</td>';
+    const b = row[v] || {pushed:0,ok:0};
+    if (!b.pushed) return '<td style="text-align:center;color:var(--text-muted)">—</td>';
+    const vr = Math.round(b.ok/b.pushed*1000)/10;
+    return `<td style="font-family:monospace;text-align:center">${b.ok}/${b.pushed}<br><span style="color:${vr >= 80 ? '#059669' : vr >= 50 ? '#D97706' : '#DC2626'};font-size:10px">${vr}%</span></td>`;
   }).join('');
   return `<tr>
     <td style="font-weight:600">${isDay ? fmtDate(key) : key}</td>
     <td style="text-align:center">${all.pushed}</td>
-    <td style="color:#DC2626;font-weight:600;text-align:center">${all.rejected}</td>
-    <td style="font-family:monospace;text-align:center">${all.reject_rate}%</td>
+    <td style="color:#059669;font-weight:600;text-align:center">${okCount}</td>
+    <td style="font-family:monospace;text-align:center">${okRate}%</td>
     ${isDay ? `<td style="text-align:center">${momHtml}</td>` : ''}
     ${cells}
   </tr>`;
@@ -1325,12 +1328,12 @@ function testRowHtml(key, row, isDay, prevRow) {
   const all = row['全部'] || {submitted:0,pass:0,fail:0,eco:0,unknown:0,pass_rate:0,fail_rate:0};
   let momHtml = '<span style="color:var(--text-muted)">—</span>';
   if (isDay && prevRow) {
-    const prevAll = prevRow['全部'] || {submitted:0,fail_rate:0};
+    const prevAll = prevRow['全部'] || {submitted:0,pass_rate:0};
     if (prevAll.submitted > 0) {
-      const diff = all.fail_rate - prevAll.fail_rate;
+      const diff = all.pass_rate - prevAll.pass_rate;
       if (Math.abs(diff) < 0.05) momHtml = '<span style="color:#64748B">持平</span>';
-      else if (diff > 0) momHtml = '<span style="color:#DC2626;font-weight:600">↑' + diff.toFixed(1) + 'pp</span>';
-      else momHtml = '<span style="color:#059669;font-weight:600">↓' + Math.abs(diff).toFixed(1) + 'pp</span>';
+      else if (diff > 0) momHtml = '<span style="color:#059669;font-weight:600">↑' + diff.toFixed(1) + 'pp</span>';
+      else momHtml = '<span style="color:#DC2626;font-weight:600">↓' + Math.abs(diff).toFixed(1) + 'pp</span>';
     }
   }
   const cells = ['0改','1改','2改','3改'].map(v => {
@@ -1342,8 +1345,8 @@ function testRowHtml(key, row, isDay, prevRow) {
   return `<tr>
     <td style="font-weight:600">${isDay ? fmtDate(key) : key}</td>
     <td style="text-align:center">${all.submitted}</td>
-    <td style="color:#DC2626;font-weight:600;text-align:center">${all.fail + all.eco}</td>
-    <td style="font-family:monospace;text-align:center">${all.fail_rate}%</td>
+    <td style="color:#059669;font-weight:600;text-align:center">${all.pass}</td>
+    <td style="font-family:monospace;text-align:center">${all.pass_rate}%</td>
     ${isDay ? `<td style="text-align:center">${momHtml}</td>` : ''}
     ${cells}
   </tr>`;
@@ -1387,17 +1390,19 @@ function renderRejectWeekTable() {
   }
   weekBody.innerHTML = showKeys.map((k, i) => {
     const cur = d[k] || {};
-    const all = cur['全部'] || (isTest ? {submitted:0,pass:0,fail:0,eco:0,unknown:0,fail_rate:0} : {pushed:0,rejected:0,reject_rate:0});
+    const all = cur['全部'] || (isTest ? {submitted:0,pass:0,fail:0,eco:0,unknown:0,pass_rate:0,fail_rate:0} : {pushed:0,rejected:0,reject_rate:0,ok:0});
     // 环比：上一周（ordered 中前一个）
     const oi = ordered.indexOf(k);
     const prevCur = oi > 0 ? (d[ordered[oi-1]] || {}) : null;
     const prevAll = prevCur ? (prevCur['全部'] || null) : null;
     let momHtml = '<span style="color:var(--text-muted)">—</span>';
     if (prevAll && prevAll[isTest ? 'submitted' : 'pushed'] > 0) {
-      const diff = (isTest ? all.fail_rate : all.reject_rate) - (isTest ? prevAll.fail_rate : prevAll.reject_rate);
+      const curRate = isTest ? all.pass_rate : (all.pushed > 0 ? Math.round(all.ok/all.pushed*1000)/10 : 0);
+      const prevRate = isTest ? prevAll.pass_rate : (prevAll.pushed > 0 ? Math.round(prevAll.ok/prevAll.pushed*1000)/10 : 0);
+      const diff = curRate - prevRate;
       if (Math.abs(diff) < 0.05) momHtml = '<span style="color:#64748B">持平</span>';
-      else if (diff > 0) momHtml = '<span style="color:#DC2626;font-weight:600">↑' + diff.toFixed(1) + 'pp</span>';
-      else momHtml = '<span style="color:#059669;font-weight:600">↓' + Math.abs(diff).toFixed(1) + 'pp</span>';
+      else if (diff > 0) momHtml = '<span style="color:#059669;font-weight:600">↑' + diff.toFixed(1) + 'pp</span>';
+      else momHtml = '<span style="color:#DC2626;font-weight:600">↓' + Math.abs(diff).toFixed(1) + 'pp</span>';
     }
     const cells = ['0改','1改','2改','3改'].map(v => {
       const b = cur[v] || null;
@@ -1407,18 +1412,18 @@ function renderRejectWeekTable() {
           ? `<td style="font-family:monospace;text-align:center">${b.pass}/${b.submitted}<br><span style="color:${b.pass_rate >= 50 ? '#059669' : b.pass_rate >= 20 ? '#D97706' : '#DC2626'};font-size:10px">${b.pass_rate}%</span></td>`
           : '<td style="text-align:center;color:var(--text-muted)">—</td>';
       }
-      return b.pushed > 0
-        ? `<td style="font-family:monospace;text-align:center">${b.rejected}/${b.pushed}<br><span style="color:${b.reject_rate >= 40 ? '#DC2626' : b.reject_rate >= 20 ? '#D97706' : '#059669'};font-size:10px">${b.reject_rate}%</span></td>`
-        : '<td style="text-align:center;color:var(--text-muted)">—</td>';
+      if (!b.pushed) return '<td style="text-align:center;color:var(--text-muted)">—</td>';
+      const vr = Math.round(b.ok/b.pushed*1000)/10;
+      return `<td style="font-family:monospace;text-align:center">${b.ok}/${b.pushed}<br><span style="color:${vr >= 80 ? '#059669' : vr >= 50 ? '#D97706' : '#DC2626'};font-size:10px">${vr}%</span></td>`;
     }).join('');
     const total = isTest ? all.submitted : all.pushed;
-    const bad = isTest ? (all.fail + all.eco) : all.rejected;
-    const badRate = isTest ? all.fail_rate : all.reject_rate;
+    const okCount = isTest ? all.pass : (all.ok || 0);
+    const okRate = isTest ? all.pass_rate : (all.pushed > 0 ? Math.round(all.ok/all.pushed*1000)/10 : 0);
     return `<tr>
       <td style="font-weight:600">${k}</td>
       <td style="text-align:center">${total}</td>
-      <td style="color:#DC2626;font-weight:600;text-align:center">${bad}</td>
-      <td style="font-family:monospace;text-align:center">${badRate}%</td>
+      <td style="color:#059669;font-weight:600;text-align:center">${okCount}</td>
+      <td style="font-family:monospace;text-align:center">${okRate}%</td>
       <td style="text-align:center">${momHtml}</td>
       ${cells}
     </tr>`;
