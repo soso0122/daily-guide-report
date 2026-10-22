@@ -2411,6 +2411,15 @@ function initTabs() {
         const key = r.id || r.name;
         if (!map[key]) {
           map[key] = Object.assign({}, r);
+          // 播放质量加权累加器（率×展示；有值才累计）
+          map[key]._w3 = (r.q3 != null && r.q3 > 0) ? r.q3 * r.impressions : 0;
+          map[key]._i3 = (r.q3 != null && r.q3 > 0) ? r.impressions : 0;
+          map[key]._w5 = (r.q5 != null && r.q5 > 0) ? r.q5 * r.impressions : 0;
+          map[key]._i5 = (r.q5 != null && r.q5 > 0) ? r.impressions : 0;
+          map[key]._wf = (r.qf != null && r.qf > 0) ? r.qf * r.impressions : 0;
+          map[key]._if = (r.qf != null && r.qf > 0) ? r.impressions : 0;
+          map[key]._wd = (r.qd != null && r.qd > 0) ? r.qd * r.impressions : 0;
+          map[key]._id = (r.qd != null && r.qd > 0) ? r.impressions : 0;
         } else {
           // 累加数值字段
           map[key].spend       += r.spend;
@@ -2423,13 +2432,19 @@ function initTabs() {
           map[key].ctr = map[key].impressions > 0 ? map[key].clicks / map[key].impressions * 100 : 0;
           map[key].cvr = map[key].clicks > 0 ? map[key].conversions / map[key].clicks * 100 : 0;
           map[key].deep_rate = map[key].conversions > 0 ? map[key].gaoquan / map[key].conversions * 100 : 0;
-          // 播放质量：多日合并时取最新的非空值（率按日导出，不做跨天加权）
-          if (r.q3 != null) map[key].q3 = r.q3;
-          if (r.q5 != null) map[key].q5 = r.q5;
-          if (r.qf != null) map[key].qf = r.qf;
-          if (r.qd != null) map[key].qd = r.qd;
+          // 播放质量：按展示数加权累加
+          if (r.q3 != null && r.q3 > 0) { map[key]._w3 += r.q3 * r.impressions; map[key]._i3 += r.impressions; }
+          if (r.q5 != null && r.q5 > 0) { map[key]._w5 += r.q5 * r.impressions; map[key]._i5 += r.impressions; }
+          if (r.qf != null && r.qf > 0) { map[key]._wf += r.qf * r.impressions; map[key]._if += r.impressions; }
+          if (r.qd != null && r.qd > 0) { map[key]._wd += r.qd * r.impressions; map[key]._id += r.impressions; }
         }
       });
+    });
+    Object.values(map).forEach(m => {
+      m.q3 = m._i3 > 0 ? Math.round(m._w3 / m._i3 * 100) / 100 : null;
+      m.q5 = m._i5 > 0 ? Math.round(m._w5 / m._i5 * 100) / 100 : null;
+      m.qf = m._if > 0 ? Math.round(m._wf / m._if * 100) / 100 : null;
+      m.qd = m._id > 0 ? Math.round(m._wd / m._id * 100) / 100 : null;
     });
     return Object.values(map);
   }
