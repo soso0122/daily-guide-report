@@ -2341,12 +2341,17 @@ function renderPdPicker() {
   const days = allProduceDays();
   const months = [...new Set(days.map(d => d.slice(0, 2)))].sort().reverse();
   if (!pdPickerMonth) pdPickerMonth = months[0] || '';
-  // 月份按钮
+  // 月份按钮 + 全选本月
   const mb = document.getElementById('pdMonthBtns');
   if (mb) {
+    const monthDays = days.filter(d => d.slice(0, 2) === pdPickerMonth);
+    const allSel = monthDays.length > 0 && monthDays.every(d => produceDaySet.has(d));
     mb.innerHTML = months.map(mm =>
       `<button class="filter-btn ${pdPickerMonth === mm ? 'active' : ''}" style="font-size:11px;color:#64748B"
-        onclick="setPdPickerMonth('${mm}')">${parseInt(mm)}月</button>`).join('');
+        onclick="setPdPickerMonth('${mm}')">${parseInt(mm)}月</button>`).join('') +
+      `<div style="flex:1"></div>` +
+      `<button class="filter-btn ${allSel ? 'active' : ''}" style="font-size:11px;color:#D97706"
+        onclick="toggleProduceMonth('${pdPickerMonth}')">${allSel ? '取消全选' : '全选'} ${parseInt(pdPickerMonth)}月</button>`;
   }
   // 该月日期网格
   const grid = document.getElementById('pdDayGrid');
@@ -2358,6 +2363,19 @@ function renderPdPicker() {
         onclick="toggleProduceDay('${d}')">${fmtDate(d)}</button>`;
     }).join('') || '<span style="font-size:11px;color:var(--text-muted)">该月无产出</span>';
   }
+}
+
+function toggleProduceMonth(mm) {
+  const days = allProduceDays().filter(d => d.slice(0, 2) === mm);
+  const allSel = days.every(d => produceDaySet.has(d));
+  if (allSel) {
+    days.forEach(d => produceDaySet.delete(d));
+  } else {
+    days.forEach(d => produceDaySet.add(d));
+  }
+  renderPdPicker();
+  renderProduceDayChips();
+  applyProduceDayFilter();
 }
 
 function setPdPickerMonth(mm) {
@@ -2384,8 +2402,18 @@ function renderProduceDayChips() {
   const clearBtn = document.getElementById('pdClearBtn');
   if (!chips) return;
   const sel = [...produceDaySet].sort().reverse();
-  chips.innerHTML = sel.map(d =>
-    `<button class="filter-btn active" style="font-size:11px;background:#1E40AF;color:#fff;border-color:#1E40AF" onclick="toggleProduceDay('${d}')">${fmtDate(d)} ✕</button>`).join('');
+  // 按月聚合显示：该月全部产出日都在集合内 → 一个「N月(全M天)」chip
+  const months = [...new Set(sel.map(d => d.slice(0, 2)))].sort().reverse();
+  const monthFull = months.filter(mm => {
+    const monthAll = allProduceDays().filter(d => d.slice(0, 2) === mm);
+    return monthAll.length > 0 && monthAll.every(d => produceDaySet.has(d));
+  });
+  const looseDays = sel.filter(d => !monthFull.includes(d.slice(0, 2)));
+  chips.innerHTML =
+    monthFull.map(mm =>
+      `<button class="filter-btn active" style="font-size:11px;background:#1E40AF;color:#fff;border-color:#1E40AF" onclick="toggleProduceMonth('${mm}')">${parseInt(mm)}月(整月) ✕</button>`).join('') +
+    looseDays.map(d =>
+      `<button class="filter-btn active" style="font-size:11px;background:#1E40AF;color:#fff;border-color:#1E40AF" onclick="toggleProduceDay('${d}')">${fmtDate(d)} ✕</button>`).join('');
   if (clearBtn) {
     clearBtn.classList.toggle('active', sel.length === 0);
     if (sel.length === 0) { clearBtn.style.background='var(--primary)'; clearBtn.style.color='#fff'; }
