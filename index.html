@@ -84,8 +84,12 @@ body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-h
   position:sticky;top:0;background:#F1F5F9;z-index:5;
   box-shadow:0 1px 0 var(--border);
 }
+/* 悬浮表头时整体提到最高层，避免问号 tooltip 被相邻列头盖住 */
+.table-wrap thead th:hover{
+  z-index:9990;
+}
 .order-rate-value{
-  position:relative;cursor:help;
+  position:relative;
 }
 .order-rate-value:hover::after{
   content:attr(data-tip);
@@ -96,13 +100,13 @@ body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-h
   left:50%;transform:translateX(-50%);
 }
 .order-rate-badge{
-  position:relative;cursor:help;
+  position:relative;
 }
 .order-rate-badge:hover::after{
   content:attr(data-tip);
   position:fixed;z-index:99999;pointer-events:none;
   background:#1E3A8A;color:#fff;border-radius:8px;padding:8px 10px;
-  font-size:11px;font-weight:400;line-height:1.6;white-space:nowrap;
+  font-size:11px;font-weight:400;line-height:1.6;white-space:normal;word-break:break-all;
   box-shadow:0 4px 12px rgba(0,0,0,.3);
   left:50%;transform:translateX(-50%);
 }
@@ -110,7 +114,7 @@ body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-h
   content:attr(data-tip);
   position:fixed;z-index:99999;pointer-events:none;
   background:#1E3A8A;color:#fff;border-radius:8px;padding:8px 10px;
-  font-size:11px;font-weight:400;line-height:1.5;white-space:nowrap;max-width:380px;
+  font-size:11px;font-weight:400;line-height:1.5;white-space:normal;word-break:break-all;max-width:380px;
   box-shadow:0 4px 12px rgba(0,0,0,.3);
   left:50%;transform:translateX(-50%);
   bottom:auto;top:auto;
@@ -2307,6 +2311,13 @@ const PAGE_SIZE = 20;    // 每页行数
 
 function filterProduceDay(pd, btn) {
   currentProduceDay = pd;
+  // 单向联动：产出日期选具体某天时，全局日期自动跟随到该产出日对应的快照日
+  if (pd !== 'all' && window._switchDays) {
+    const label = fmtDate(pd);   // 'MM/DD'
+    if (ALL_DATES.includes(label)) {
+      window._switchDays([label]);
+    }
+  }
   pageNum = 1;
   renderTable();
 }
@@ -2338,6 +2349,11 @@ function filterProduceMonth(mm, btn) {
   currentProduceDay = mm;  // 用月份前缀过滤（renderTable 用 slice(0,2) 匹配）
   document.querySelectorAll('#produceMonthQuick .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  // 单向联动：选月份时，全局日期自动跟随到该月有快照数据的所有日期
+  if (window._switchDays) {
+    const labels = ALL_DATES.filter(d => d.startsWith(mm));
+    if (labels.length) window._switchDays(labels);
+  }
   pageNum = 1;
   renderTable();
 }
@@ -2639,7 +2655,7 @@ function updatePersonOrderRates(sortedRows) {
     const tipText = '出单素材 ' + s.order + ' 条 / 总素材 ' + s.total + ' 条';
     return `<span class="order-rate-badge" data-tip="${tipText}" style="display:inline-flex;align-items:center;gap:4px;background:${
       colors[p] || '#F8FAFC'}18;border:1px solid ${colors[p]}44;border-radius:14px;
-      padding:3px 10px;font-size:11px;font-weight:600;color:${colors[p]};cursor:help">
+      padding:3px 10px;font-size:11px;font-weight:600;color:${colors[p]}">
       ${p} 出单率 ${rate}%<span style="opacity:.6;font-weight:400">（${s.order}/${s.total}）</span>
     </span>`;
   }).join('') || '<span style="font-size:11px;color:var(--text-muted)">该筛选下无编导数据</span>';
@@ -2834,6 +2850,8 @@ function initTabs() {
 
   function switchDays(dates) {
     selectedDates = dates;
+    window._switchDays = dates => switchDays(dates);
+    window._selectedDates = selectedDates;
     const rows = mergedRows(dates);
     renderDay(rows, dates.join('+'));
     renderChannel(dates);
