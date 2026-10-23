@@ -600,11 +600,17 @@ video{max-width:100%;max-height:65vh;display:block}
     </div>
     <div style="width:100%;height:1px;background:var(--border)"></div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span class="filter-label">产出日期<span class="help-tip" data-tip="产出日期 = 素材名称开头的 MMDD 日期前缀；名称无日期时取投放数据首次出现日"></span></span>
-      <select id="produceDaySelect" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:var(--text)" onchange="filterProduceDay(this.value,this)">
-        <option value="all">全部日期</option>
-      </select>
-      <div id="produceMonthQuick" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <span class="filter-label">产出日期<span class="help-tip" data-tip="产出日期 = 素材名称开头的 MMDD 日期前缀；名称无日期时取投放数据首次出现日。可多选；选完自动联动顶部日期"></span></span>
+      <button class="filter-btn active" id="pdClearBtn" onclick="clearProduceDay(this)" style="color:#64748B">全部</button>
+      <div id="produceDayChips" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+      <div class="filter-sep"></div>
+      <div style="position:relative">
+        <button class="sort-btn" id="pdPickBtn" onclick="togglePdPicker()" style="font-size:12px">选择日期 ▾</button>
+        <div id="pdPicker" style="display:none;position:absolute;top:100%;left:0;z-index:500;background:#fff;border:1.5px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:10px;min-width:320px;max-height:360px;overflow-y:auto">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px" id="pdMonthBtns"></div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px" id="pdDayGrid"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2273,7 +2279,7 @@ function renderDay(rows, dateLabel) {
   const allAccBtn = document.querySelector('.filter-btn[data-account="all"]');
   if (allAccBtn) { allAccBtn.classList.add('active'); allAccBtn.style.background = 'var(--primary)'; allAccBtn.style.color = '#fff'; }
   currentAccountFilter = 'all';
-  currentProduceDay = 'all';
+  // 产出日期筛选在顶部日期切换时不重置（用户手动选择保留）
   // 更新表格数据源
   window.currentRows = rows;
   renderProduceDayFilters();
@@ -2303,59 +2309,103 @@ let currentType = 'all';
 let currentTag = 'all';
 let currentVersion = 'all';
 let currentAccountFilter = 'all';
-let currentProduceDay = 'all';
 let sortCol = 'spend';
 let sortAsc = false;
 let pageNum = 1;         // 当前页（1起）
 const PAGE_SIZE = 20;    // 每页行数
 
-function filterProduceDay(pd, btn) {
-  currentProduceDay = pd;
-  // 单向联动：产出日期选具体某天时，全局日期自动跟随到该产出日对应的快照日
-  if (pd !== 'all' && window._switchDays) {
-    const label = fmtDate(pd);   // 'MM/DD'
-    if (ALL_DATES.includes(label)) {
-      window._switchDays([label]);
-    }
-  }
-  pageNum = 1;
-  renderTable();
+// ---------- 产出日期多选 ----------
+let produceDaySet = new Set();   // 选中的产出日（'MMDD'）；空=全部
+let pdPickerMonth = '';          // 面板当前展示的月份
+
+function allProduceDays() {
+  const rows = ALL_ROWS || [];
+  return [...new Set(rows.map(r => r.produce_day).filter(Boolean))].sort().reverse();
 }
 
-// 产出日期下拉（具体日期）+ 月份快捷卡
-function renderProduceDayFilters() {
-  const sel = document.getElementById('produceDaySelect');
-  if (!sel) return;
-  const rows = window.currentRows || ALL_ROWS;
-  const days = [...new Set(rows.map(r => r.produce_day).filter(Boolean))].sort().reverse();
-  const prev = currentProduceDay;
-  sel.innerHTML = '<option value="all">全部日期</option>' +
-    days.map(d => `<option value="${d}">${fmtDate(d)}</option>`).join('');
-  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
-  // 月份快捷卡
-  const quick = document.getElementById('produceMonthQuick');
-  if (quick) {
-    const months = [...new Set(days.map(d => d.slice(0, 2)))].sort().reverse();
-    quick.innerHTML = months.map(mm =>
-      `<button class="filter-btn ${currentProduceDay.slice(0,2) === mm ? 'active' : ''}" style="color:#64748B"
-        onclick="filterProduceMonth('${mm}',this)">${parseInt(mm)}月</button>`).join('');
+function togglePdPicker() {
+  const picker = document.getElementById('pdPicker');
+  if (!picker) return;
+  const show = picker.style.display === 'none';
+  picker.style.display = show ? 'block' : 'none';
+  if (show) renderPdPicker();
+}
+
+function renderPdPicker() {
+  const days = allProduceDays();
+  const months = [...new Set(days.map(d => d.slice(0, 2)))].sort().reverse();
+  if (!pdPickerMonth) pdPickerMonth = months[0] || '';
+  // 月份按钮
+  const mb = document.getElementById('pdMonthBtns');
+  if (mb) {
+    mb.innerHTML = months.map(mm =>
+      `<button class="filter-btn ${pdPickerMonth === mm ? 'active' : ''}" style="font-size:11px;color:#64748B"
+        onclick="setPdPickerMonth('${mm}')">${parseInt(mm)}月</button>`).join('');
+  }
+  // 该月日期网格
+  const grid = document.getElementById('pdDayGrid');
+  if (grid) {
+    const monthDays = days.filter(d => d.slice(0, 2) === pdPickerMonth);
+    grid.innerHTML = monthDays.map(d => {
+      const sel = produceDaySet.has(d);
+      return `<button class="filter-btn ${sel ? 'active' : ''}" style="font-size:11px;font-family:monospace;${sel ? 'background:#1E40AF;color:#fff' : 'color:#64748B'}"
+        onclick="toggleProduceDay('${d}')">${fmtDate(d)}</button>`;
+    }).join('') || '<span style="font-size:11px;color:var(--text-muted)">该月无产出</span>';
   }
 }
 
-// 月份快捷卡：筛选该月所有日期（在下拉框里体现为选中该月最新一天并过滤该月）
-function filterProduceMonth(mm, btn) {
-  const sel = document.getElementById('produceDaySelect');
-  const days = [...sel.options].map(o => o.value).filter(v => v.startsWith(mm));
-  currentProduceDay = mm;  // 用月份前缀过滤（renderTable 用 slice(0,2) 匹配）
-  document.querySelectorAll('#produceMonthQuick .filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  // 单向联动：选月份时，全局日期自动跟随到该月有快照数据的所有日期
-  if (window._switchDays) {
-    const labels = ALL_DATES.filter(d => d.startsWith(mm));
+function setPdPickerMonth(mm) {
+  pdPickerMonth = mm;
+  renderPdPicker();
+}
+
+function toggleProduceDay(d) {
+  if (produceDaySet.has(d)) produceDaySet.delete(d);
+  else produceDaySet.add(d);
+  renderPdPicker();
+  renderProduceDayChips();
+  applyProduceDayFilter();
+}
+
+function clearProduceDay(btn) {
+  produceDaySet.clear();
+  renderProduceDayChips();
+  applyProduceDayFilter();
+}
+
+function renderProduceDayChips() {
+  const chips = document.getElementById('produceDayChips');
+  const clearBtn = document.getElementById('pdClearBtn');
+  if (!chips) return;
+  const sel = [...produceDaySet].sort().reverse();
+  chips.innerHTML = sel.map(d =>
+    `<button class="filter-btn active" style="font-size:11px;background:#1E40AF;color:#fff;border-color:#1E40AF" onclick="toggleProduceDay('${d}')">${fmtDate(d)} ✕</button>`).join('');
+  if (clearBtn) {
+    clearBtn.classList.toggle('active', sel.length === 0);
+    if (sel.length === 0) { clearBtn.style.background='var(--primary)'; clearBtn.style.color='#fff'; }
+    else { clearBtn.style.background=''; clearBtn.style.color='#64748B'; }
+  }
+}
+
+function applyProduceDayFilter() {
+  // 单向联动：选中产出日对应的所有快照日 → 全局日期并集
+  if (produceDaySet.size && window._switchDays) {
+    const labels = [...produceDaySet].map(d => fmtDate(d)).filter(l => ALL_DATES.includes(l));
     if (labels.length) window._switchDays(labels);
   }
   pageNum = 1;
   renderTable();
+}
+
+// 兼容旧引用：renderProduceDayFilters 现在渲染 chips + 面板
+function renderProduceDayFilters() {
+  renderProduceDayChips();
+  const clearBtn = document.getElementById('pdClearBtn');
+  if (clearBtn && produceDaySet.size === 0) {
+    clearBtn.classList.add('active');
+    clearBtn.style.background = 'var(--primary)';
+    clearBtn.style.color = '#fff';
+  }
 }
 
 function filterTag(tag, btn) {
@@ -2552,9 +2602,7 @@ function renderTable() {
       currentTag === 'keytest' ? r.is_key_test :
       (r.tag && r.tag.split(',').some(t => t.split('-')[0].trim() === currentTag)))
     .filter(r => currentVersion === 'all' ? true : r.version === currentVersion)
-    .filter(r => currentProduceDay === 'all' ? true :
-      currentProduceDay.length === 2 ? (r.produce_day || '').slice(0, 2) === currentProduceDay :
-      r.produce_day === currentProduceDay);
+    .filter(r => produceDaySet.size === 0 ? true : produceDaySet.has(r.produce_day));
   const sorted = sortRows(filtered);
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   if (pageNum > totalPages) pageNum = totalPages;
@@ -2852,6 +2900,13 @@ function initTabs() {
     selectedDates = dates;
     window._switchDays = dates => switchDays(dates);
     window._selectedDates = selectedDates;
+    // 同步顶部日期触发按钮文本（多选时显示「N 天已选」）
+    const trig = document.querySelector('.tab-select');
+    if (trig) {
+      trig.textContent = dates.length === 1
+        ? dates[0] + ' ¥' + (daySpend[dates[0]] != null ? daySpend[dates[0]].toFixed(0) : '0')
+        : dates.length + ' 天已选';
+    }
     const rows = mergedRows(dates);
     renderDay(rows, dates.join('+'));
     renderChannel(dates);
