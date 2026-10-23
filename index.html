@@ -1034,6 +1034,7 @@ function updatePersonCards(rows, auditData) {
         <div style="background:#EFF6FF;border-radius:6px;padding:7px 9px">
           <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">出单率<span class="help-tip" data-tip="出单率 = 深转>0 的素材数 ÷ 该编导总素材数；按名称基础名去重；跟随顶部日期筛选"></span></div>
           <div class="order-rate-value" style="font-size:13px;font-weight:700;color:#1E40AF;font-family:monospace" data-tip="${orderTipOf(p)}">${orderRateOf(p)}</div>
+          <div style="font-size:10px;color:#64748B;margin-top:1px;font-family:monospace">${orderFractionOf(p)}</div>
         </div>
       </div>
       ${auditHtml}
@@ -1051,6 +1052,11 @@ function updatePersonCards(rows, auditData) {
     const s = orderRateStats[p];
     if (!s || s.total === 0) return '—';
     return (s.order / s.total * 100).toFixed(0) + '%';
+  }
+  function orderFractionOf(p) {
+    const s = orderRateStats[p];
+    if (!s) return '—';
+    return s.order + ' / ' + s.total + ' 条';
   }
   function orderTipOf(p) {
     const s = orderRateStats[p];
