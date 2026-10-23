@@ -73,16 +73,18 @@ body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-h
 .kpi-diff.down{color:var(--danger)}
 .help-tip{
   display:inline-flex;align-items:center;justify-content:center;
-  width:14px;height:14px;border-radius:50%;background:#DBEAFE;color:#1E40AF;
-  font-size:10px;font-weight:700;cursor:help;margin-left:3px;flex-shrink:0;
-  position:relative;vertical-align:middle;
+  width:11px;height:11px;border-radius:50%;background:#DBEAFE;color:#1E40AF;
+  font-size:9px;font-weight:700;line-height:1;cursor:help;margin-left:3px;flex-shrink:0;
+  position:relative;vertical-align:middle;text-align:center;
 }
 .help-tip:hover::after{
   content:attr(data-tip);
-  position:absolute;bottom:130%;left:50%;transform:translateX(-50%);
+  position:fixed;z-index:99999;pointer-events:none;
   background:#1E3A8A;color:#fff;border-radius:8px;padding:8px 10px;
-  font-size:11px;font-weight:400;line-height:1.5;white-space:nowrap;z-index:999;
-  box-shadow:0 4px 12px rgba(0,0,0,.25);pointer-events:none;
+  font-size:11px;font-weight:400;line-height:1.5;white-space:nowrap;max-width:380px;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  left:50%;transform:translateX(-50%);
+  bottom:auto;top:auto;
 }
 .tc-diff{font-weight:600;display:inline-block}
 .tc-diff.inc{color:var(--success)}
@@ -486,12 +488,13 @@ video{max-width:100%;max-height:65vh;display:block}
       <div class="section-title" style="margin:0">📈 近3周过审视频+图文跑出表现 <span id="passWindowLabel" style="color:var(--text-muted);font-weight:400;font-size:11px"></span></div>
       <div style="display:flex;gap:6px" id="passWeekBtns">
         <button class="sort-btn active" id="passWeekAll" onclick="setPassWeek('all',this)">全部3周</button>
-        <button class="sort-btn" id="passWeek1" onclick="setPassWeek('w1',this)">第1周(最近)</button>
+        <button class="sort-btn" id="passWeek1" onclick="setPassWeek('w1',this)">第1周</button>
         <button class="sort-btn" id="passWeek2" onclick="setPassWeek('w2',this)">第2周</button>
         <button class="sort-btn" id="passWeek3" onclick="setPassWeek('w3',this)">第3周</button>
       </div>
     </div>
     <div id="passSummaryRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center"></div>
+    <div id="passPersonSummaryRow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px"></div>
     <div id="passPersonCards" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
     <div class="table-wrap" style="max-height:420px;overflow-y:auto">
       <table style="font-size:12px" id="passListTable">
@@ -542,8 +545,9 @@ video{max-width:100%;max-height:65vh;display:block}
     <div style="width:100%;height:1px;background:var(--border)"></div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="filter-label">产出日期<span class="help-tip" data-tip="产出日期 = 素材名称开头的 MMDD 日期前缀；名称无日期时取投放数据首次出现日"></span></span>
-      <button class="filter-btn active" data-pd="all" onclick="filterProduceDay('all',this)">全部</button>
-      <div id="produceDayFilters" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <select id="produceDaySelect" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:var(--text)" onchange="filterProduceDay(this.value,this)">
+        <option value="all">全部月份</option>
+      </select>
     </div>
     <div style="width:100%;height:1px;background:var(--border)"></div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -1218,6 +1222,21 @@ function updateAuditCards(data) {
   }
 }
 
+// ---------- 问号 tooltip 跟随定位 ----------
+document.addEventListener('mouseover', e => {
+  const tip = e.target.closest && e.target.closest('.help-tip');
+  if (!tip) return;
+  const rect = tip.getBoundingClientRect();
+  const tipW = Math.min(380, (tip.getAttribute('data-tip') || '').length * 12 + 20);
+  let left = rect.left + rect.width/2 - tipW/2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+  const style = document.createElement('style');
+  style.id = 'helpTipPos';
+  style.textContent = `.help-tip:hover::after{left:${left}px !important;top:${rect.top - 8}px !important;transform:none !important}`;
+  document.getElementById('helpTipPos')?.remove();
+  document.head.appendChild(style);
+}, true);
+
 // ---------- 卡审分析 & 近3周跑出 ----------
 let analysisMode = 'delivery';        // delivery(投放账户) | test(测试账户)
 let rejFilter = 'all';               // delivery: all/immediate/inuse/ok；test: all/pass/fail/eco/unknown
@@ -1239,6 +1258,7 @@ function labelToKey(label) { return label.replace('/', ''); }   // '10/20' → '
 
 function setRejDates(dates) {
   REJ_DATES = dates;
+  updatePassWeekLabels();
   renderRejectModules();
 }
 
@@ -1727,12 +1747,31 @@ function passWindowForDates() {
 let passPersonFilter = 'all';   // all | 编导名
 let passWeek = 'all';           // all | w1(最近7天) | w2 | w3
 
+function weekRangeLabel(wIdx) {
+  // w1=最近7天，w2=再前7天，w3=再前7天；返回 'MM/DD-MM/DD'
+  const [start, end] = passWindowForDates();
+  const f = d => ('0'+(d.getMonth()+1)).slice(-2) + '/' + ('0'+d.getDate()).slice(-2);
+  if (wIdx === 'w1') return f(new Date(end.getTime() - 6*86400000)) + '-' + f(end);
+  if (wIdx === 'w2') return f(new Date(end.getTime() - 13*86400000)) + '-' + f(new Date(end.getTime() - 7*86400000));
+  return f(start) + '-' + f(new Date(end.getTime() - 14*86400000));
+}
+
 function setPassWeek(w, btn) {
   passWeek = w;
   document.querySelectorAll('#passWeekBtns .sort-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderPassPersonCards();
   renderPassList();
+}
+
+function updatePassWeekLabels() {
+  // 周按钮显示实际日期区间
+  const w1 = document.getElementById('passWeek1');
+  const w2 = document.getElementById('passWeek2');
+  const w3 = document.getElementById('passWeek3');
+  if (w1) w1.textContent = '第1周 ' + weekRangeLabel('w1');
+  if (w2) w2.textContent = '第2周 ' + weekRangeLabel('w2');
+  if (w3) w3.textContent = '第3周 ' + weekRangeLabel('w3');
 }
 
 function passWeekStartOf(cPushDay, wStart, wEnd) {
@@ -1868,9 +1907,14 @@ function renderPassList() {
 
 function renderPassSummary(rows) {
   const container = document.getElementById('passSummaryRow');
+  const personContainer = document.getElementById('passPersonSummaryRow');
   if (!container) return;
-  if (!rows.length) { container.innerHTML = ''; return; }
-  // 全部汇总
+  if (!rows.length) {
+    container.innerHTML = '';
+    if (personContainer) personContainer.innerHTML = '';
+    return;
+  }
+  // 全部汇总（1张卡）
   const tSpend = rows.reduce((s,c) => s+c.spend, 0);
   const tConv = rows.reduce((s,c) => s+c.conv, 0);
   const tGq = rows.reduce((s,c) => s+c.gq, 0);
@@ -1879,32 +1923,44 @@ function renderPassSummary(rows) {
   const ctr = tImp > 0 ? tClick/tImp*100 : -1;
   const cpa = tConv > 0 ? tSpend/tConv : -1;
   const deep = tConv > 0 ? tGq/tConv*100 : -1;
-  const badge = (label, val) => `<span style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:14px;padding:3px 10px;font-size:11px;font-weight:600;color:#1E40AF">${label} ${val}</span>`;
-  let html = `<span style="font-size:11px;color:var(--text-secondary);font-weight:600">全部汇总</span>` +
-    badge('点击率', ctr >= 0 ? ctr.toFixed(2)+'%' : '—') +
-    badge('CPA', cpa >= 0 ? '¥'+cpa.toFixed(0) : '—') +
-    badge('转化', tConv) +
-    badge('高潜', tGq) +
-    badge('深转率', deep >= 0 ? deep.toFixed(1)+'%' : '—');
-  // 各编导汇总
+  const cell = (l, v) => `<div style="background:#F8FAFC;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:10px;color:#94A3B8">${l}</div><div style="font-size:14px;font-weight:700;font-family:monospace;color:#1E40AF">${v}</div></div>`;
+  container.innerHTML = `<div style="flex:1;background:#fff;border:1.5px solid #BFDBFE;border-radius:10px;padding:12px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+    <div style="font-size:12px;font-weight:700;color:#1E3A8A;margin-bottom:8px">全部汇总</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+      ${cell('点击率', ctr >= 0 ? ctr.toFixed(2)+'%' : '—')}
+      ${cell('CPA', cpa >= 0 ? '¥'+cpa.toFixed(0) : '—')}
+      ${cell('转化', tConv)}
+      ${cell('高潜', tGq)}
+      ${cell('深转率', deep >= 0 ? deep.toFixed(1)+'%' : '—')}
+    </div>
+  </div>`;
+  // 各编导汇总（4张卡）
   const CORE = ['小敏','瑞晨','嘉丽','雅迪'];
-  CORE.forEach(p => {
-    const sub = rows.filter(c => c.r.person === p);
-    if (!sub.length) return;
-    const sp = sub.reduce((s,c)=>s+c.spend,0);
-    const cv = sub.reduce((s,c)=>s+c.conv,0);
-    const gq = sub.reduce((s,c)=>s+c.gq,0);
-    const imp = sub.reduce((s,c)=>s+c.imp,0);
-    const clk = sub.reduce((s,c)=>s+c.click,0);
-    const pctr = imp>0 ? clk/imp*100 : -1;
-    const pcpa = cv>0 ? sp/cv : -1;
-    const pdeep = cv>0 ? gq/cv*100 : -1;
-    const color = PERSON_COLORS[p] || '#64748B';
-    html += `<button class="sort-btn" style="font-size:10px;color:${color};padding:2px 10px" onclick="setPassPerson('${p}',this);renderPassPersonCards();">
-      ${p} CTR${pctr>=0?pctr.toFixed(1):'—'}% · CPA${pcpa>=0?'¥'+pcpa.toFixed(0):'—'} · 转${cv} · 高潜${gq} · 深转${pdeep>=0?pdeep.toFixed(1)+'%':'—'}
-    </button>`;
-  });
-  container.innerHTML = html;
+  if (personContainer) {
+    personContainer.innerHTML = CORE.map(p => {
+      const sub = rows.filter(c => c.r.person === p);
+      if (!sub.length) return '<div style="background:#F8FAFC;border:1.5px dashed #E2E8F0;border-radius:10px;padding:12px 16px;color:#94A3B8;font-size:12px;text-align:center">无数据</div>';
+      const sp = sub.reduce((s,c)=>s+c.spend,0);
+      const cv = sub.reduce((s,c)=>s+c.conv,0);
+      const gq = sub.reduce((s,c)=>s+c.gq,0);
+      const imp = sub.reduce((s,c)=>s+c.imp,0);
+      const clk = sub.reduce((s,c)=>s+c.click,0);
+      const pctr = imp>0 ? clk/imp*100 : -1;
+      const pcpa = cv>0 ? sp/cv : -1;
+      const pdeep = cv>0 ? gq/cv*100 : -1;
+      const color = PERSON_COLORS[p] || '#64748B';
+      return `<div style="background:#fff;border:1.5px solid ${color}44;border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer" onclick="setPassPerson('${p}',this);renderPassPersonCards();">
+        <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:8px">${p}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;color:#64748B">
+          <span>点击率 <b style="color:#1E40AF">${pctr>=0?pctr.toFixed(2)+'%':'—'}</b></span>
+          <span>CPA <b style="color:#1E40AF">${pcpa>=0?'¥'+pcpa.toFixed(0):'—'}</b></span>
+          <span>转化 <b style="color:#059669">${cv}</b></span>
+          <span>高潜 <b style="color:#D97706">${gq}</b></span>
+          <span>深转率 <b style="color:#D97706">${pdeep>=0?pdeep.toFixed(1)+'%':'—'}</b></span>
+        </div>
+      </div>`;
+    }).join('');
+  }
 }
 
 function openPassVideo(encodedId) {
@@ -1953,6 +2009,7 @@ function bindRejectSorts() {
 function initRejectModules() {
   setupModeUI();
   bindRejectSorts();
+  updatePassWeekLabels();
   renderRejectModules();
 }
 
@@ -2195,23 +2252,20 @@ const PAGE_SIZE = 20;    // 每页行数
 
 function filterProduceDay(pd, btn) {
   currentProduceDay = pd;
-  document.querySelectorAll('.filter-btn[data-pd]').forEach(b => {
-    b.classList.remove('active'); b.style.background=''; b.style.color='var(--text-secondary)';
-  });
-  btn.classList.add('active');
-  btn.style.background = 'var(--primary)'; btn.style.color = '#fff';
   pageNum = 1;
   renderTable();
 }
 
-// 产出日期筛选按钮（跟随当前数据动态生成）
+// 产出日期下拉（按月份；选中某月=按该月所有天过滤）
 function renderProduceDayFilters() {
-  const container = document.getElementById('produceDayFilters');
-  if (!container) return;
+  const sel = document.getElementById('produceDaySelect');
+  if (!sel) return;
   const rows = window.currentRows || ALL_ROWS;
-  const days = [...new Set(rows.map(r => r.produce_day).filter(Boolean))].sort().reverse();
-  container.innerHTML = days.map(d =>
-    `<button class="filter-btn" data-pd="${d}" onclick="filterProduceDay('${d}',this)">${fmtDate(d)}</button>`).join('');
+  const months = [...new Set(rows.map(r => (r.produce_day || '').slice(0, 2)).filter(Boolean))].sort().reverse();
+  const prev = currentProduceDay;
+  sel.innerHTML = '<option value="all">全部月份</option>' +
+    months.map(mm => `<option value="${mm}">${parseInt(mm)}月</option>`).join('');
+  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
 
 function filterTag(tag, btn) {
@@ -2408,7 +2462,7 @@ function renderTable() {
       currentTag === 'keytest' ? r.is_key_test :
       (r.tag && r.tag.split(',').some(t => t.split('-')[0].trim() === currentTag)))
     .filter(r => currentVersion === 'all' ? true : r.version === currentVersion)
-    .filter(r => currentProduceDay === 'all' ? true : r.produce_day === currentProduceDay);
+    .filter(r => currentProduceDay === 'all' ? true : (r.produce_day || '').slice(0, 2) === currentProduceDay);
   const sorted = sortRows(filtered);
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   if (pageNum > totalPages) pageNum = totalPages;
@@ -2506,9 +2560,10 @@ function updatePersonOrderRates(sortedRows) {
   container.innerHTML = CORE.filter(p => stats[p]).map(p => {
     const s = stats[p];
     const rate = s.total > 0 ? (s.order / s.total * 100).toFixed(0) : 0;
-    return `<span style="display:inline-flex;align-items:center;gap:4px;background:${
+    const tipText = '出单素材 ' + s.order + ' 条 / 总素材 ' + s.total + ' 条';
+    return `<span class="help-tip" data-tip="${tipText}" style="display:inline-flex;align-items:center;gap:4px;background:${
       colors[p] || '#F8FAFC'}18;border:1px solid ${colors[p]}44;border-radius:14px;
-      padding:3px 10px;font-size:11px;font-weight:600;color:${colors[p]}">
+      padding:3px 10px;font-size:11px;font-weight:600;color:${colors[p]};cursor:help">
       ${p} 出单率 ${rate}%<span style="opacity:.6;font-weight:400">（${s.order}/${s.total}）</span>
     </span>`;
   }).join('') || '<span style="font-size:11px;color:var(--text-muted)">该筛选下无编导数据</span>';
