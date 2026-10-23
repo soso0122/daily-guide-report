@@ -74,8 +74,37 @@ body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-h
 .help-tip{
   display:inline-flex;align-items:center;justify-content:center;
   width:11px;height:11px;border-radius:50%;background:#DBEAFE;color:#1E40AF;
-  font-size:9px;font-weight:700;line-height:1;cursor:help;margin-left:3px;flex-shrink:0;
+  font-size:9px;font-weight:700;line-height:1;margin-left:3px;flex-shrink:0;
   position:relative;vertical-align:middle;text-align:center;
+}
+.help-tip::before{
+  content:'?';
+}
+.table-wrap thead th{
+  position:sticky;top:0;background:#F1F5F9;z-index:5;
+  box-shadow:0 1px 0 var(--border);
+}
+.order-rate-value{
+  position:relative;cursor:help;
+}
+.order-rate-value:hover::after{
+  content:attr(data-tip);
+  position:fixed;z-index:99999;pointer-events:none;
+  background:#1E3A8A;color:#fff;border-radius:8px;padding:8px 10px;
+  font-size:11px;font-weight:400;line-height:1.6;white-space:pre-wrap;max-width:420px;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  left:50%;transform:translateX(-50%);
+}
+.order-rate-badge{
+  position:relative;cursor:help;
+}
+.order-rate-badge:hover::after{
+  content:attr(data-tip);
+  position:fixed;z-index:99999;pointer-events:none;
+  background:#1E3A8A;color:#fff;border-radius:8px;padding:8px 10px;
+  font-size:11px;font-weight:400;line-height:1.6;white-space:nowrap;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+  left:50%;transform:translateX(-50%);
 }
 .help-tip:hover::after{
   content:attr(data-tip);
@@ -544,13 +573,6 @@ video{max-width:100%;max-height:65vh;display:block}
     </div>
     <div style="width:100%;height:1px;background:var(--border)"></div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span class="filter-label">产出日期<span class="help-tip" data-tip="产出日期 = 素材名称开头的 MMDD 日期前缀；名称无日期时取投放数据首次出现日"></span></span>
-      <select id="produceDaySelect" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:var(--text)" onchange="filterProduceDay(this.value,this)">
-        <option value="all">全部月份</option>
-      </select>
-    </div>
-    <div style="width:100%;height:1px;background:var(--border)"></div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span class="filter-label">改版</span>
       <button class="filter-btn active" data-version="all" onclick="filterVersion('all',this)">全部</button>
       <button class="filter-btn" data-version="0改" onclick="filterVersion('0改',this)" style="color:#64748B">0改</button>
@@ -571,6 +593,14 @@ video{max-width:100%;max-height:65vh;display:block}
       <button class="filter-btn active" data-account="all" onclick="filterAccount('all',this)">全部</button>
       <div class="filter-sep"></div>
       <div id="accountFilters" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+    <div style="width:100%;height:1px;background:var(--border)"></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="filter-label">产出日期<span class="help-tip" data-tip="产出日期 = 素材名称开头的 MMDD 日期前缀；名称无日期时取投放数据首次出现日"></span></span>
+      <select id="produceDaySelect" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:var(--text)" onchange="filterProduceDay(this.value,this)">
+        <option value="all">全部日期</option>
+      </select>
+      <div id="produceMonthQuick" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
   </div>
 
@@ -877,13 +907,16 @@ function updatePersonCards(rows, auditData) {
       personStats[p].click += r.clicks;
       personStats[p].imp   += r.impressions;
     }
-    // 出单率：基础名去重；出单 = 深转(高潜)>0（任一版本）
+    // 出单率：基础名去重；出单 = 深转(高潜)>0（任一版本）；记录出单素材名
     let bn = (r.name || '').replace(/\.mp4$/, '').replace(/-(\d)改$/, '').replace(/-改$/, '');
-    if (!orderRateStats[p]) orderRateStats[p] = {total:0, order:0, seen:new Set()};
+    if (!orderRateStats[p]) orderRateStats[p] = {total:0, order:0, seen:new Set(), orderNames:[]};
     if (!orderRateStats[p].seen.has(bn)) {
       orderRateStats[p].seen.add(bn);
       orderRateStats[p].total += 1;
-      if ((r.gaoquan || 0) > 0) orderRateStats[p].order += 1;
+      if ((r.gaoquan || 0) > 0) {
+        orderRateStats[p].order += 1;
+        orderRateStats[p].orderNames.push(r.name);
+      }
     }
   });
 
@@ -989,8 +1022,8 @@ function updatePersonCards(rows, auditData) {
           <div style="font-size:13px;font-weight:700;color:#D97706;font-family:monospace">${deepRate}</div>
         </div>
         <div style="background:#EFF6FF;border-radius:6px;padding:7px 9px">
-          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">出单率<span class="help-tip" data-tip="出单率 = 深转>0 的素材数 ÷ 该编导总素材数；按名称基础名去重（同名多版本算一条，任一版本深转>0 即出单）；跟随顶部日期筛选"></span></div>
-          <div style="font-size:13px;font-weight:700;color:#1E40AF;font-family:monospace">${orderRateOf(p)}</div>
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">出单率<span class="help-tip" data-tip="出单率 = 深转>0 的素材数 ÷ 该编导总素材数；按名称基础名去重；跟随顶部日期筛选"></span></div>
+          <div class="order-rate-value" style="font-size:13px;font-weight:700;color:#1E40AF;font-family:monospace" data-tip="${orderTipOf(p)}">${orderRateOf(p)}</div>
         </div>
       </div>
       ${auditHtml}
@@ -1008,6 +1041,13 @@ function updatePersonCards(rows, auditData) {
     const s = orderRateStats[p];
     if (!s || s.total === 0) return '—';
     return (s.order / s.total * 100).toFixed(0) + '%';
+  }
+  function orderTipOf(p) {
+    const s = orderRateStats[p];
+    if (!s) return '暂无数据';
+    const names = (s.orderNames || []).slice(0, 20).join('、');
+    const more = (s.orderNames || []).length > 20 ? ' 等' : '';
+    return '出单素材（' + s.order + ' 条）: ' + (names || '无') + more + ' ｜ 分母（总素材数）: ' + s.total + ' 条';
   }
 }
 
@@ -1923,15 +1963,23 @@ function renderPassSummary(rows) {
   const ctr = tImp > 0 ? tClick/tImp*100 : -1;
   const cpa = tConv > 0 ? tSpend/tConv : -1;
   const deep = tConv > 0 ? tGq/tConv*100 : -1;
+  // 出单统计：基础名去重，深转>0 即出单
+  const orderSet = new Set();
+  rows.forEach(c => { if ((c.gq || 0) > 0) orderSet.add(c.r.id || c.r.name); });
+  const orderCount = orderSet.size;
+  const totalMat = new Set(rows.map(c => c.r.id || c.r.name)).size;
+  const orderRate = totalMat > 0 ? (orderCount / totalMat * 100) : 0;
   const cell = (l, v) => `<div style="background:#F8FAFC;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:10px;color:#94A3B8">${l}</div><div style="font-size:14px;font-weight:700;font-family:monospace;color:#1E40AF">${v}</div></div>`;
   container.innerHTML = `<div style="flex:1;background:#fff;border:1.5px solid #BFDBFE;border-radius:10px;padding:12px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
     <div style="font-size:12px;font-weight:700;color:#1E3A8A;margin-bottom:8px">全部汇总</div>
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
       ${cell('点击率', ctr >= 0 ? ctr.toFixed(2)+'%' : '—')}
       ${cell('CPA', cpa >= 0 ? '¥'+cpa.toFixed(0) : '—')}
       ${cell('转化', tConv)}
       ${cell('高潜', tGq)}
       ${cell('深转率', deep >= 0 ? deep.toFixed(1)+'%' : '—')}
+      ${cell('出单数', orderCount)}
+      ${cell('出单率', orderRate.toFixed(0)+'%')}
     </div>
   </div>`;
   // 各编导汇总（4张卡）
@@ -1948,6 +1996,11 @@ function renderPassSummary(rows) {
       const pctr = imp>0 ? clk/imp*100 : -1;
       const pcpa = cv>0 ? sp/cv : -1;
       const pdeep = cv>0 ? gq/cv*100 : -1;
+      const pOrderSet = new Set();
+      sub.forEach(c => { if ((c.gq || 0) > 0) pOrderSet.add(c.r.id || c.r.name); });
+      const pOrderCount = pOrderSet.size;
+      const pTotalMat = new Set(sub.map(c => c.r.id || c.r.name)).size;
+      const pOrderRate = pTotalMat > 0 ? (pOrderCount / pTotalMat * 100) : 0;
       const color = PERSON_COLORS[p] || '#64748B';
       return `<div style="background:#fff;border:1.5px solid ${color}44;border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer" onclick="setPassPerson('${p}',this);renderPassPersonCards();">
         <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:8px">${p}</div>
@@ -1957,6 +2010,8 @@ function renderPassSummary(rows) {
           <span>转化 <b style="color:#059669">${cv}</b></span>
           <span>高潜 <b style="color:#D97706">${gq}</b></span>
           <span>深转率 <b style="color:#D97706">${pdeep>=0?pdeep.toFixed(1)+'%':'—'}</b></span>
+          <span>出单 <b style="color:#D97706">${pOrderCount}/${pTotalMat}</b></span>
+          <span>出单率 <b style="color:#D97706">${pOrderRate.toFixed(0)+'%'}</b></span>
         </div>
       </div>`;
     }).join('');
@@ -2256,16 +2311,35 @@ function filterProduceDay(pd, btn) {
   renderTable();
 }
 
-// 产出日期下拉（按月份；选中某月=按该月所有天过滤）
+// 产出日期下拉（具体日期）+ 月份快捷卡
 function renderProduceDayFilters() {
   const sel = document.getElementById('produceDaySelect');
   if (!sel) return;
   const rows = window.currentRows || ALL_ROWS;
-  const months = [...new Set(rows.map(r => (r.produce_day || '').slice(0, 2)).filter(Boolean))].sort().reverse();
+  const days = [...new Set(rows.map(r => r.produce_day).filter(Boolean))].sort().reverse();
   const prev = currentProduceDay;
-  sel.innerHTML = '<option value="all">全部月份</option>' +
-    months.map(mm => `<option value="${mm}">${parseInt(mm)}月</option>`).join('');
+  sel.innerHTML = '<option value="all">全部日期</option>' +
+    days.map(d => `<option value="${d}">${fmtDate(d)}</option>`).join('');
   if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  // 月份快捷卡
+  const quick = document.getElementById('produceMonthQuick');
+  if (quick) {
+    const months = [...new Set(days.map(d => d.slice(0, 2)))].sort().reverse();
+    quick.innerHTML = months.map(mm =>
+      `<button class="filter-btn ${currentProduceDay.slice(0,2) === mm ? 'active' : ''}" style="color:#64748B"
+        onclick="filterProduceMonth('${mm}',this)">${parseInt(mm)}月</button>`).join('');
+  }
+}
+
+// 月份快捷卡：筛选该月所有日期（在下拉框里体现为选中该月最新一天并过滤该月）
+function filterProduceMonth(mm, btn) {
+  const sel = document.getElementById('produceDaySelect');
+  const days = [...sel.options].map(o => o.value).filter(v => v.startsWith(mm));
+  currentProduceDay = mm;  // 用月份前缀过滤（renderTable 用 slice(0,2) 匹配）
+  document.querySelectorAll('#produceMonthQuick .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  pageNum = 1;
+  renderTable();
 }
 
 function filterTag(tag, btn) {
@@ -2462,7 +2536,9 @@ function renderTable() {
       currentTag === 'keytest' ? r.is_key_test :
       (r.tag && r.tag.split(',').some(t => t.split('-')[0].trim() === currentTag)))
     .filter(r => currentVersion === 'all' ? true : r.version === currentVersion)
-    .filter(r => currentProduceDay === 'all' ? true : (r.produce_day || '').slice(0, 2) === currentProduceDay);
+    .filter(r => currentProduceDay === 'all' ? true :
+      currentProduceDay.length === 2 ? (r.produce_day || '').slice(0, 2) === currentProduceDay :
+      r.produce_day === currentProduceDay);
   const sorted = sortRows(filtered);
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   if (pageNum > totalPages) pageNum = totalPages;
@@ -2561,7 +2637,7 @@ function updatePersonOrderRates(sortedRows) {
     const s = stats[p];
     const rate = s.total > 0 ? (s.order / s.total * 100).toFixed(0) : 0;
     const tipText = '出单素材 ' + s.order + ' 条 / 总素材 ' + s.total + ' 条';
-    return `<span class="help-tip" data-tip="${tipText}" style="display:inline-flex;align-items:center;gap:4px;background:${
+    return `<span class="order-rate-badge" data-tip="${tipText}" style="display:inline-flex;align-items:center;gap:4px;background:${
       colors[p] || '#F8FAFC'}18;border:1px solid ${colors[p]}44;border-radius:14px;
       padding:3px 10px;font-size:11px;font-weight:600;color:${colors[p]};cursor:help">
       ${p} 出单率 ${rate}%<span style="opacity:.6;font-weight:400">（${s.order}/${s.total}）</span>
