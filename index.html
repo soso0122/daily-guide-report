@@ -233,8 +233,8 @@ tbody tr:last-child{border-bottom:none}
 .status-active{background:#ECFDF5;color:#059669}
 .status-inactive{background:#F8FAFC;color:#94A3B8}
 
-.mat-name{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:12px;color:var(--text)}
+.mat-name{max-width:260px;white-space:normal;word-break:break-all;
+  font-size:12px;color:var(--text);line-height:1.45}
 .num{font-family:'Fira Code',monospace;font-size:12px}
 .num-zero{color:var(--text-muted)}
 .num-hi{color:var(--success);font-weight:600}
@@ -2698,7 +2698,7 @@ function renderTable() {
     return `<tr>
       <td><span class="person-badge" style="background:${bg};color:${pc}">${r.person}</span></td>
       <td><span style="font-size:11px;color:var(--text-secondary);white-space:nowrap" title="${r.account}">${(r.account||'').replace('高中-猿起武汉-', '').replace('【agent测试】', '').replace('【agent智擎】', '').replace('高中-渠道-', '渠道-')}</span></td>
-      <td><div style="display:flex;align-items:center;gap:4px">
+      <td><div style="display:flex;align-items:flex-start;gap:4px;flex-wrap:wrap">
         <span class="mat-name" title="${r.name}">${r.name}</span>${extBadge}${tuwenBadge}${homepageBadge}${aiBadge}${collabBadge}${keyTestBadge}</div></td>
       <td><span class="mat-id" style="font-family:monospace;font-size:11px;color:var(--text-muted);white-space:nowrap" title="${r.id}">${r.id || '—'}</span></td>
       <td>${tagDisp}</td>
