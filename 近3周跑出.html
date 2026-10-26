@@ -1107,12 +1107,14 @@ let passPersonFilter = 'all';   // all | 编导名
 let passWeek = 'all';           // all | w1(最近7天) | w2 | w3
 
 function weekRangeLabel(wIdx) {
-  // w1=最近7天，w2=再前7天，w3=再前7天；返回 'MM/DD-MM/DD'
   const [start, end] = passWindowForDates();
   const f = d => ('0'+(d.getMonth()+1)).slice(-2) + '/' + ('0'+d.getDate()).slice(-2);
-  if (wIdx === 'w1') return f(new Date(end.getTime() - 6*86400000)) + '-' + f(end);
-  if (wIdx === 'w2') return f(new Date(end.getTime() - 13*86400000)) + '-' + f(new Date(end.getTime() - 7*86400000));
-  return f(start) + '-' + f(new Date(end.getTime() - 14*86400000));
+  const endDow = end.getDay();
+  const weekEnd = new Date(end.getTime() + ((7 - endDow) % 7) * 86400000);
+  const weekStart = new Date(weekEnd.getTime() - 6*86400000);
+  if (wIdx === 'w1') return f(weekStart) + '-' + f(weekEnd);
+  if (wIdx === 'w2') return f(new Date(weekStart.getTime() - 7*86400000)) + '-' + f(new Date(weekEnd.getTime() - 7*86400000));
+  return f(new Date(weekStart.getTime() - 14*86400000)) + '-' + f(new Date(weekEnd.getTime() - 14*86400000));
 }
 
 function setPassWeek(w, btn) {
@@ -1134,13 +1136,15 @@ function updatePassWeekLabels() {
 }
 
 function passWeekStartOf(cPushDay, wStart, wEnd) {
-  // 返回该产出日落在第几周：w1=最近7天，w2=再前7天，w3=再前7天；窗口外返回 null
   const t = new Date(2026, parseInt(cPushDay.slice(0,2))-1, parseInt(cPushDay.slice(2))).getTime();
   if (t < wStart || t > wEnd) return null;
-  const daysFromEnd = Math.floor((wEnd - t) / 86400000);
-  if (daysFromEnd < 7) return 'w1';
-  if (daysFromEnd < 14) return 'w2';
-  return 'w3';
+  const endDow = new Date(wEnd).getDay();
+  const weekEnd = new Date(wEnd + ((7 - endDow) % 7) * 86400000).getTime();
+  const weekStart = weekEnd - 6*86400000;
+  if (t >= weekStart && t <= weekEnd) return 'w1';
+  if (t >= weekStart - 7*86400000 && t <= weekEnd - 7*86400000) return 'w2';
+  if (t >= weekStart - 14*86400000 && t <= weekEnd - 14*86400000) return 'w3';
+  return null;
 }
 
 function renderPassPersonCards() {
@@ -1269,8 +1273,18 @@ function renderPassSummary(rows) {
   const _lastD = _selDates[_selDates.length-1] || ALL_DATES[ALL_DATES.length-1];
   const _end = new Date(2026, parseInt(_lastD.slice(0,2))-1, parseInt(_lastD.slice(3)));
   const _start = new Date(_end.getTime() - 21*86400000);
-  const _win = {s: ('0'+(_start.getMonth()+1)).slice(-2) + ('0'+_start.getDate()).slice(-2),
+  let _win = {s: ('0'+(_start.getMonth()+1)).slice(-2) + ('0'+_start.getDate()).slice(-2),
                e: ('0'+(_end.getMonth()+1)).slice(-2) + ('0'+_end.getDate()).slice(-2)};
+  if (passWeek !== 'all') {
+    const endDow = _end.getDay();
+    const weekEnd = new Date(_end.getTime() + ((7 - endDow) % 7) * 86400000);
+    const weekStart = new Date(weekEnd.getTime() - 6*86400000);
+    const off = passWeek === 'w2' ? 7 : passWeek === 'w3' ? 14 : 0;
+    const wS = new Date(weekStart.getTime() - off*86400000);
+    const wE = new Date(weekEnd.getTime() - off*86400000);
+    _win = {s: ('0'+(wS.getMonth()+1)).slice(-2) + ('0'+wS.getDate()).slice(-2),
+            e: ('0'+(wE.getMonth()+1)).slice(-2) + ('0'+wE.getDate()).slice(-2)};
+  }
   const container = document.getElementById('passSummaryRow');
   const personContainer = document.getElementById('passPersonSummaryRow');
   if (!container) return;
@@ -1325,6 +1339,7 @@ function renderPassSummary(rows) {
       const pctr = imp>0 ? clk/imp*100 : -1;
       const pcpa = cv>0 ? sp/cv : -1;
       const pdeep = cv>0 ? gq/cv*100 : -1;
+      const pcvr = clk>0 ? cv/clk*100 : -1;
       const pOrderSet = new Set();
       sub.forEach(c => { if ((c.gq || 0) > 0) pOrderSet.add(c.r.id || c.r.name); });
       const pOrderCount = pOrderSet.size;
@@ -1338,16 +1353,17 @@ function renderPassSummary(rows) {
           <span>点击率 <b style="color:#1E40AF">${pctr>=0?pctr.toFixed(2)+'%':'—'}</b></span>
           <span>CPA <b style="color:#1E40AF">${pcpa>=0?'¥'+pcpa.toFixed(0):'—'}</b></span>
           <span>转化 <b style="color:#059669">${cv}</b></span>
+          <span>转化率 <b style="color:#8B5CF6">${pcvr>=0?pcvr.toFixed(2)+'%':'—'}</b></span>
           <span>高潜 <b style="color:#D97706">${gq}</b></span>
           <span>深转率 <b style="color:#D97706">${pdeep>=0?pdeep.toFixed(1)+'%':'—'}</b></span>
-          <span>开口率 <b style="color:#1E40AF">${_open.open_rate != null ? _open.open_rate+'%' : '—'}</b></span>
           <span>开口 <b style="color:#1E40AF">${_open.conv}/${_open.total}</b></span>
-          <span>成单率 <b style="color:#8B5CF6">${_open.order_rate != null ? _open.order_rate+'%' : '—'}</b></span>
+          <span>开口率 <b style="color:#1E40AF">${_open.open_rate != null ? _open.open_rate+'%' : '—'}</b></span>
           <span>成单 <b style="color:#8B5CF6">${_open.gq}/${Math.max(_open.gq,_open.conv)}</b></span>
-          <span>跑出率 <b style="color:#D97706">${_open.run_rate != null ? _open.run_rate+'%' : '—'}</b></span>
+          <span>成单率 <b style="color:#8B5CF6">${_open.order_rate != null ? _open.order_rate+'%' : '—'}</b></span>
           <span>跑出 <b style="color:#D97706">${_open.runout}/${_open.total}</b></span>
-          <span>出单 <b style="color:#D97706">${pOrderCount}/${pTotalMat}</b></span>
-          <span>出单率 <b style="color:#D97706">${pOrderRate.toFixed(0)+'%'}</b></span>
+          <span>跑出率 <b style="color:#D97706">${_open.run_rate != null ? _open.run_rate+'%' : '—'}</b></span>
+          <span>出单 <b style="color:#D97706">${_open.gq}/${_open.total}</b></span>
+          <span>出单率 <b style="color:#D97706">${_open.chulv_rate != null ? _open.chulv_rate+'%' : '—'}</b></span>
         </div>
       </div>`;
     }).join('');

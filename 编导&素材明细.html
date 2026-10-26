@@ -747,6 +747,8 @@ function mergedRows(dates) {
         const key = r.id || r.name;
         if (!map[key]) {
           map[key] = Object.assign({}, r);
+          map[key]._names = [r.name];
+          map[key]._accounts = r.account ? [r.account] : [];
           // 播放质量加权累加器（率×展示；有值才累计）
           map[key]._w3 = (r.q3 != null && r.q3 > 0) ? r.q3 * r.impressions : 0;
           map[key]._i3 = (r.q3 != null && r.q3 > 0) ? r.impressions : 0;
@@ -757,6 +759,10 @@ function mergedRows(dates) {
           map[key]._wd = (r.qd != null && r.qd > 0) ? r.qd * r.impressions : 0;
           map[key]._id = (r.qd != null && r.qd > 0) ? r.impressions : 0;
         } else {
+          if (!map[key]._names) map[key]._names = [map[key].name];
+          if (!map[key]._names.includes(r.name)) map[key]._names.push(r.name);
+          if (!map[key]._accounts) map[key]._accounts = map[key].account ? [map[key].account] : [];
+          if (r.account && !map[key]._accounts.includes(r.account)) map[key]._accounts.push(r.account);
           // 累加数值字段
           map[key].spend       += r.spend;
           map[key].impressions += r.impressions;
@@ -782,7 +788,12 @@ function mergedRows(dates) {
       m.qf = m._if > 0 ? Math.round(m._wf / m._if * 100) / 100 : null;
       m.qd = m._id > 0 ? Math.round(m._wd / m._id * 100) / 100 : null;
     });
-    return Object.values(map);
+    return Object.values(map).map(function(m) {
+      if (m._names && m._names.length > 1) m.name = m._names.join(" / ");
+      if (m._accounts && m._accounts.length > 1) m.account = m._accounts.join(" / ");
+      delete m._names; delete m._accounts;
+      return m;
+    });
   }
 
   function updatePersonCards(rows, auditData) {
