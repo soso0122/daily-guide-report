@@ -424,7 +424,7 @@ video{max-width:100%;max-height:65vh;display:block}
         <div class="table-info">显示 <span id="visibleCount">-</span> / {material_count} 条 · 点击列头排序 · <span id="pagerBox"></span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center" id="personOrderRateRow">
-        <span style="font-size:11px;color:var(--text-secondary)">编导开口率<span class="help-tip" data-tip="开口率 = 有转化素材数 ÷ 该编导总素材数（按名称基础名去重）；跟随顶部日期、产出日期、标签/类型筛选联动"></span></span>
+        <span style="font-size:11px;color:var(--text-secondary)">编导高潜成交率<span class="help-tip" data-tip="高潜成交率 = 深转>0 的素材数 ÷ 该编导总素材数（按名称基础名去重：同名多版本算一条，任一版本深转>0 即高潜成交）；跟随顶部日期、产出日期、标签/类型筛选联动"></span></span>
         <span id="personOrderRates" style="display:flex;gap:6px;flex-wrap:wrap"></span>
       </div>
     </div>
@@ -609,12 +609,13 @@ const DateBar = (function(){
   };
 })();
 
-// ============ 编导/总览四率统一计算（基础名去重，分母含无消耗） ============
-// 口径：
-//   开口率 = 有转化素材数 ÷ 全部素材数（窗口内有转化）
-//   成单率 = 有高潜素材数 ÷ 有转化素材数
-//   出单率 = 有高潜素材数 ÷ 全部素材数（= 开口率×成单率）
-//   跑出率 = 深转累计≥5单素材数 ÷ 全部素材数
+// ============ 编导/总览五率统一计算（基础名去重，分母含无消耗） ============
+// 口径（2026-10-26 改名）：
+//   转化成交率 = 转化>0素材数 ÷ 产出投放素材数
+//   高潜成交率（转化） = 深转>0素材数 ÷ 转化>0素材数
+//   高潜成交率 = 深转>0素材数 ÷ 产出投放素材数
+//   高潜跑出率 = 深转≥5素材数 ÷ 产出投放素材数
+//   高潜跑出率（转化） = 深转≥5素材数 ÷ 转化>0素材数
 function _dateRange(dates){
   const keys = dates.map(d => d.replace('/',''));
   return {s: keys.reduce((a,b) => a < b ? a : b), e: keys.reduce((a,b) => a > b ? a : b)};
@@ -673,10 +674,11 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
   const pct = (a,b) => b > 0 ? Math.round(a/b*1000)/10 : null;
   return {
     total, conv, gq, runout,
-    open_rate: pct(conv, total),           // 开口率
-    order_rate: pct(gq, Math.max(conv, gq)),  // 成单率
-    chulv_rate: pct(gq, total),            // 出单率
-    run_rate: pct(runout, total),          // 跑出率
+    open_rate: pct(conv, total),           // 转化成交率（内部键沿用旧名）
+    order_rate: pct(gq, Math.max(conv, gq)),  // 高潜成交率（转化）
+    chulv_rate: pct(gq, total),            // 高潜成交率
+    run_rate: pct(runout, total),          // 高潜跑出率
+    conv_run_rate: pct(runout, conv),      // 高潜跑出率（转化）
   };
 }
 
@@ -843,10 +845,11 @@ function mergedRows(dates) {
       ['\u9ad8\u6f5c\u6210\u4ea4', String(gQ), '', '#D97706'],
       ['CPA', cpa, '', '#64748B'],
       ['\u6df1\u8f6c\u7387', deep, '', '#D97706'],
-      ['\u5f00\u53e3\u7387', _all4.open_rate != null ? _all4.open_rate+'%' : '\u2014', _all4.conv+'/'+_all4.total+' \u6761', '#1E40AF'],
-      ['\u6210\u5355\u7387', _all4.order_rate != null ? _all4.order_rate+'%' : '\u2014', _all4.gq+'/'+Math.max(_all4.gq,_all4.conv)+' \u6761', '#8B5CF6'],
-      ['\u51fa\u5355\u7387', _all4.chulv_rate != null ? _all4.chulv_rate+'%' : '\u2014', _all4.gq+'/'+_all4.total+' \u6761', '#D97706'],
-      ['\u8dd1\u51fa\u7387', _all4.run_rate != null ? _all4.run_rate+'%' : '\u2014', _all4.runout+'/'+_all4.total+' \u6761', '#D97706']
+      ['\u8f6c\u5316\u6210\u4ea4\u7387', _all4.open_rate != null ? _all4.open_rate+'%' : '\u2014', _all4.conv+'/'+_all4.total+' \u6761', '#1E40AF'],
+      ['\u9ad8\u6f5c\u6210\u4ea4\u7387\uff08\u8f6c\u5316\uff09', _all4.order_rate != null ? _all4.order_rate+'%' : '\u2014', _all4.gq+'/'+Math.max(_all4.gq,_all4.conv)+' \u6761', '#8B5CF6'],
+      ['\u9ad8\u6f5c\u6210\u4ea4\u7387', _all4.chulv_rate != null ? _all4.chulv_rate+'%' : '\u2014', _all4.gq+'/'+_all4.total+' \u6761', '#D97706'],
+      ['\u9ad8\u6f5c\u8dd1\u51fa\u7387', _all4.run_rate != null ? _all4.run_rate+'%' : '\u2014', _all4.runout+'/'+_all4.total+' \u6761', '#D97706'],
+      ['\u9ad8\u6f5c\u8dd1\u51fa\u7387\uff08\u8f6c\u5316\uff09', _all4.conv_run_rate != null ? _all4.conv_run_rate+'%' : '\u2014', _all4.runout+'/'+_all4.conv+' \u6761', '#9A3412']
     ];
     const cellHtml = cells.map(c => '<div style="background:#F8FAFC;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:10px;color:#94A3B8">' + c[0] + '</div><div style="font-size:13px;font-weight:700;font-family:monospace;color:' + c[3] + '">' + c[1] + '</div>' + (c[2] ? '<div style="font-size:9px;color:#64748B">' + c[2] + '</div>' : '') + '</div>').join('');
     _el.innerHTML = '<div style="background:#fff;border:1.5px solid #1E40AF44;border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
@@ -862,7 +865,7 @@ function mergedRows(dates) {
   }
   function frRate(p, kind){
     const f = frOf(p);
-    const v = kind === 'order' ? f.order_rate : kind === 'run' ? f.run_rate : kind === 'chulv' ? f.chulv_rate : f.open_rate;
+    const v = kind === 'order' ? f.order_rate : kind === 'run' ? f.run_rate : kind === 'chulv' ? f.chulv_rate : kind === 'conv_run' ? f.conv_run_rate : f.open_rate;
     return v != null ? v + '%' : '\u2014';
   }
   function frFrac(p, kind){
@@ -870,14 +873,16 @@ function mergedRows(dates) {
     if (kind === 'order') return f.gq + ' / ' + Math.max(f.gq, f.conv) + ' \u6761';
     if (kind === 'run') return f.runout + ' / ' + f.total + ' \u6761';
     if (kind === 'chulv') return f.gq + ' / ' + f.total + ' \u6761';
+    if (kind === 'conv_run') return f.runout + ' / ' + f.conv + ' \u6761';
     return f.conv + ' / ' + f.total + ' \u6761';
   }
   function frTip(p, kind){
     const f = frOf(p);
-    if (kind === 'order') return '\u6709\u9ad8\u6f5c\u7d20\u6750 ' + f.gq + ' \u6761 \u00f7 \u6709\u8f6c\u5316\u6216\u9ad8\u6f5c\u7d20\u6750 ' + Math.max(f.gq, f.conv) + ' \u6761';
-    if (kind === 'run') return '\u6df1\u8f6c\u22655\u5355\u7d20\u6750 ' + f.runout + ' \u6761 \u00f7 \u5168\u90e8\u7d20\u6750 ' + f.total + ' \u6761';
-    if (kind === 'chulv') return '\u6709\u9ad8\u6f5c\u7d20\u6750 ' + f.gq + ' \u6761 \u00f7 \u5168\u90e8\u7d20\u6750 ' + f.total + ' \u6761';
-    return '\u6709\u8f6c\u5316\u7d20\u6750 ' + f.conv + ' \u6761 \u00f7 \u5168\u90e8\u7d20\u6750 ' + f.total + ' \u6761';
+    if (kind === 'order') return '\u6df1\u8f6c>0\u7d20\u6750 ' + f.gq + ' \u6761 \u00f7 \u8f6c\u5316>0\u7d20\u6750 ' + Math.max(f.gq, f.conv) + ' \u6761';
+    if (kind === 'run') return '\u6df1\u8f6c\u22655\u5355\u7d20\u6750 ' + f.runout + ' \u6761 \u00f7 \u4ea7\u51fa\u6295\u653e\u7d20\u6750 ' + f.total + ' \u6761';
+    if (kind === 'chulv') return '\u6df1\u8f6c>0\u7d20\u6750 ' + f.gq + ' \u6761 \u00f7 \u4ea7\u51fa\u6295\u653e\u7d20\u6750 ' + f.total + ' \u6761';
+    if (kind === 'conv_run') return '\u6df1\u8f6c\u22655\u5355\u7d20\u6750 ' + f.runout + ' \u6761 \u00f7 \u8f6c\u5316>0\u7d20\u6750 ' + f.conv + ' \u6761';
+    return '\u8f6c\u5316>0\u7d20\u6750 ' + f.conv + ' \u6761 \u00f7 \u4ea7\u51fa\u6295\u653e\u7d20\u6750 ' + f.total + ' \u6761';
   }
   renderAllDirectorCard();
   _personRows = rows; _personAudit = auditData;
@@ -894,7 +899,7 @@ function mergedRows(dates) {
   const ALL_PERSONS_ORDER = ["小敏", "嘉丽", "浩正", "雅迪", "婷玉", "魏怡", "瑞晨", "国星", "外部", "主页", "其他"];
   const CORE_EDITORS = ['小敏', '瑞晨', '嘉丽', '雅迪'];
   const personStats = {};
-  const orderRateStats = {};  // 出单率：基础名去重
+  const orderRateStats = {};  // 高潜成交率：基础名去重
   rows.forEach(r => {
     if (r.is_ai) return;  // AI素材不计入编导
     const p = r.person;
@@ -912,7 +917,7 @@ function mergedRows(dates) {
       personStats[p].click += r.clicks;
       personStats[p].imp   += r.impressions;
     }
-    // 出单率：基础名去重；出单 = 深转(高潜)>0（任一版本）；记录出单素材名
+    // 高潜成交率：基础名去重；高潜成交 = 深转>0（任一版本）；记录高潜成交素材名
     let bn = (r.name || '').replace(/\.mp4$/, '').replace(/-(\d)改$/, '').replace(/-改$/, '');
     if (!orderRateStats[p]) orderRateStats[p] = {total:0, order:0, open:0, seen:new Set(), orderNames:[]};
     if (!orderRateStats[p].seen.has(bn)) {
@@ -1028,20 +1033,30 @@ function mergedRows(dates) {
           <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">深转率</div>
           <div style="font-size:13px;font-weight:700;color:#D97706;font-family:monospace">${deepRate}</div>
         </div>
-        <div style="background:#EFF6FF;border-radius:6px;padding:7px 9px">
-          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">开口率<span class="help-tip" data-tip="开口率 = 有转化素材数 ÷ 该编导全部素材数（基础名去重），跟随日期筛选"></span></div>
+        <div style="background:#F8FAFC;border-radius:6px;padding:7px 9px">
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">转化成交率<span class="help-tip" data-tip="转化成交率 = 转化>0素材数 ÷ 产出投放素材数（基础名去重）"></span></div>
           <div class="order-rate-value" style="font-size:13px;font-weight:700;color:#1E40AF;font-family:monospace" data-tip="${frTip(p,'open')}">${frRate(p,'open')}</div>
           <div style="font-size:10px;color:#64748B;margin-top:1px;font-family:monospace">${frFrac(p,'open')}</div>
         </div>
         <div style="background:#F5F3FF;border-radius:6px;padding:7px 9px">
-          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">成单率<span class="help-tip" data-tip="成单率 = 有高潜素材数 ÷ 有转化素材数（基础名去重）"></span></div>
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">高潜成交率（转化）<span class="help-tip" data-tip="高潜成交率（转化） = 深转>0素材数 ÷ 转化>0素材数（基础名去重）"></span></div>
           <div class="order-rate-value" style="font-size:13px;font-weight:700;color:#8B5CF6;font-family:monospace" data-tip="${frTip(p,'order')}">${frRate(p,'order')}</div>
           <div style="font-size:10px;color:#64748B;margin-top:1px;font-family:monospace">${frFrac(p,'order')}</div>
         </div>
         <div style="background:#EFF6FF;border-radius:6px;padding:7px 9px">
-          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">出单率<span class="help-tip" data-tip="出单率 = 深转>0 的素材数 ÷ 该编导总素材数；按名称基础名去重；跟随顶部日期筛选"></span></div>
-          <div class="order-rate-value" style="font-size:13px;font-weight:700;color:#1E40AF;font-family:monospace" data-tip="${frTip(p,'chulv')}">${frRate(p,'chulv')}</div>
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">高潜成交率<span class="help-tip" data-tip="高潜成交率 = 深转>0素材数 ÷ 产出投放素材数（基础名去重）"></span></div>
+          <div class="order-rate-value" style="font-size:13px;font-weight:700;color:#D97706;font-family:monospace" data-tip="${frTip(p,'chulv')}">${frRate(p,'chulv')}</div>
           <div style="font-size:10px;color:#64748B;margin-top:1px;font-family:monospace">${frFrac(p,'chulv')}</div>
+        </div>
+        <div style="background:#FFF7ED;border-radius:6px;padding:7px 9px">
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">高潜跑出率<span class="help-tip" data-tip="高潜跑出率 = 深转≥5单素材数 ÷ 产出投放素材数（基础名去重）"></span></div>
+          <div class="order-rate-value" style="font-size:13px;font-weight:700;color:#D97706;font-family:monospace" data-tip="${frTip(p,'run')}">${frRate(p,'run')}</div>
+          <div style="font-size:10px;color:#64748B;margin-top:1px;font-family:monospace">${frFrac(p,'run')}</div>
+        </div>
+        <div style="background:#FFFBEB;border-radius:6px;padding:7px 9px">
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">高潜跑出率（转化）<span class="help-tip" data-tip="高潜跑出率（转化） = 深转≥5单素材数 ÷ 转化>0素材数（基础名去重）"></span></div>
+          <div class="order-rate-value" style="font-size:13px;font-weight:700;color:#9A3412;font-family:monospace" data-tip="${frTip(p,'conv_run')}">${frRate(p,'conv_run')}</div>
+          <div style="font-size:10px;color:#64748B;margin-top:1px;font-family:monospace">${frFrac(p,'conv_run')}</div>
         </div>
       </div>
       ${auditHtml}
@@ -1070,7 +1085,7 @@ function mergedRows(dates) {
     if (!s) return '暂无数据';
     const names = (s.orderNames || []).slice(0, 20).join('、');
     const more = (s.orderNames || []).length > 20 ? ' 等' : '';
-    return '出单素材（' + s.order + ' 条）: ' + (names || '无') + more + ' ｜ 分母（总素材数）: ' + s.total + ' 条';
+    return '高潜成交素材（' + s.order + ' 条）: ' + (names || '无') + more + ' ｜ 分母（总素材数）: ' + s.total + ' 条';
   }
 }
 
@@ -1478,7 +1493,7 @@ function renderTable() {
   updatePersonOrderRates(filteredAll);
 }
 
-// ---------- 编导出单率徽章（跟随筛选联动） ----------
+// ---------- 编导高潜成交率徽章（跟随筛选联动） ----------
 function updatePersonOrderRates(sortedRows) {
   const container = document.getElementById('personOrderRates');
   if (!container) return;
@@ -1500,11 +1515,11 @@ function updatePersonOrderRates(sortedRows) {
   container.innerHTML = CORE.filter(p => stats[p]).map(p => {
     const s = stats[p];
     const rate = s.total > 0 ? (s.order / s.total * 100).toFixed(0) : 0;
-    const tipText = '出单素材 ' + s.order + ' 条 / 总素材 ' + s.total + ' 条';
+    const tipText = '高潜成交素材 ' + s.order + ' 条 / 总素材 ' + s.total + ' 条';
     return `<span class="order-rate-badge" data-tip="${tipText}" style="display:inline-flex;align-items:center;gap:4px;background:${
       colors[p] || '#F8FAFC'}18;border:1px solid ${colors[p]}44;border-radius:14px;
       padding:3px 10px;font-size:11px;font-weight:600;color:${colors[p]}">
-      ${p} 出单率 ${rate}%<span style="opacity:.6;font-weight:400">（${s.order}/${s.total}）</span>
+      ${p} 高潜成交率 ${rate}%<span style="opacity:.6;font-weight:400">（${s.order}/${s.total}）</span>
     </span>`;
   }).join('') || '<span style="font-size:11px;color:var(--text-muted)">该筛选下无编导数据</span>';
 }
@@ -1941,10 +1956,11 @@ function renderAllDirectorCard(){
     ['高潜成交', String(gQ), '', '#D97706'],
     ['CPA', cpa, '', '#64748B'],
     ['深转率', deep, '', '#D97706'],
-    ['开口率', _all4.open_rate != null ? _all4.open_rate+'%' : '—', _all4.conv+'/'+_all4.total+' 条', '#1E40AF'],
-    ['成单率', _all4.order_rate != null ? _all4.order_rate+'%' : '—', _all4.gq+'/'+Math.max(_all4.gq,_all4.conv)+' 条', '#8B5CF6'],
-    ['出单率', _all4.chulv_rate != null ? _all4.chulv_rate+'%' : '—', _all4.gq+'/'+_all4.total+' 条', '#D97706'],
-    ['跑出率', _all4.run_rate != null ? _all4.run_rate+'%' : '—', _all4.runout+'/'+_all4.total+' 条', '#D97706']
+    ['转化成交率', _all4.open_rate != null ? _all4.open_rate+'%' : '—', _all4.conv+'/'+_all4.total+' 条', '#1E40AF'],
+    ['高潜成交率（转化）', _all4.order_rate != null ? _all4.order_rate+'%' : '—', _all4.gq+'/'+Math.max(_all4.gq,_all4.conv)+' 条', '#8B5CF6'],
+    ['高潜成交率', _all4.chulv_rate != null ? _all4.chulv_rate+'%' : '—', _all4.gq+'/'+_all4.total+' 条', '#D97706'],
+    ['高潜跑出率', _all4.run_rate != null ? _all4.run_rate+'%' : '—', _all4.runout+'/'+_all4.total+' 条', '#D97706'],
+    ['高潜跑出率（转化）', _all4.conv_run_rate != null ? _all4.conv_run_rate+'%' : '—', _all4.runout+'/'+_all4.conv+' 条', '#9A3412']
   ];
   const cellHtml = cells.map(c =>
     '<div style="background:#F8FAFC;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:10px;color:#94A3B8">' + c[0] + '</div><div style="font-size:13px;font-weight:700;font-family:monospace;color:' + c[3] + '">' + c[1] + '</div>' + (c[2] ? '<div style="font-size:9px;color:#64748B">' + c[2] + '</div>' : '') + '</div>'
@@ -2040,7 +2056,7 @@ function updatePersonOrderRates(sortedRows){
     const openRate = s.total > 0 ? (s.conv/s.total*100).toFixed(0) : 0;
     const tipText = '有转化素材 ' + s.conv + ' 条 / 总素材 ' + s.total + ' 条';
     return `<span class="order-rate-badge" data-tip="${tipText}" style="display:inline-flex;align-items:center;gap:4px;background:${colors[p]||'#F8FAFC'}18;border:1px solid ${colors[p]}44;border-radius:14px;padding:3px 10px;font-size:11px;font-weight:600;color:${colors[p]}">
-      ${p} 开口率 ${openRate}%<span style="opacity:.6;font-weight:400">（${s.conv}/${s.total}）</span>
+      ${p} 转化成交率 ${openRate}%<span style="opacity:.6;font-weight:400">（${s.conv}/${s.total}）</span>
     </span>`;
   }).join('') || '<span style="font-size:11px;color:var(--text-muted)">该筛选下无编导数据</span>';
 }

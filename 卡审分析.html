@@ -567,12 +567,13 @@ const DateBar = (function(){
   };
 })();
 
-// ============ 编导/总览四率统一计算（基础名去重，分母含无消耗） ============
-// 口径：
-//   开口率 = 有转化素材数 ÷ 全部素材数（窗口内有转化）
-//   成单率 = 有高潜素材数 ÷ 有转化素材数
-//   出单率 = 有高潜素材数 ÷ 全部素材数（= 开口率×成单率）
-//   跑出率 = 深转累计≥5单素材数 ÷ 全部素材数
+// ============ 编导/总览五率统一计算（基础名去重，分母含无消耗） ============
+// 口径（2026-10-26 改名）：
+//   转化成交率 = 转化>0素材数 ÷ 产出投放素材数
+//   高潜成交率（转化） = 深转>0素材数 ÷ 转化>0素材数
+//   高潜成交率 = 深转>0素材数 ÷ 产出投放素材数
+//   高潜跑出率 = 深转≥5素材数 ÷ 产出投放素材数
+//   高潜跑出率（转化） = 深转≥5素材数 ÷ 转化>0素材数
 function _dateRange(dates){
   const keys = dates.map(d => d.replace('/',''));
   return {s: keys.reduce((a,b) => a < b ? a : b), e: keys.reduce((a,b) => a > b ? a : b)};
@@ -631,10 +632,11 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
   const pct = (a,b) => b > 0 ? Math.round(a/b*1000)/10 : null;
   return {
     total, conv, gq, runout,
-    open_rate: pct(conv, total),           // 开口率
-    order_rate: pct(gq, Math.max(conv, gq)),  // 成单率
-    chulv_rate: pct(gq, total),            // 出单率
-    run_rate: pct(runout, total),          // 跑出率
+    open_rate: pct(conv, total),           // 转化成交率（内部键沿用旧名）
+    order_rate: pct(gq, Math.max(conv, gq)),  // 高潜成交率（转化）
+    chulv_rate: pct(gq, total),            // 高潜成交率
+    run_rate: pct(runout, total),          // 高潜跑出率
+    conv_run_rate: pct(runout, conv),      // 高潜跑出率（转化）
   };
 }
 

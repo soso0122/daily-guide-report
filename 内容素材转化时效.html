@@ -568,12 +568,13 @@ const DateBar = (function(){
   };
 })();
 
-// ============ 编导/总览四率统一计算（基础名去重，分母含无消耗） ============
-// 口径：
-//   开口率 = 有转化素材数 ÷ 全部素材数（窗口内有转化）
-//   成单率 = 有高潜素材数 ÷ 有转化素材数
-//   出单率 = 有高潜素材数 ÷ 全部素材数（= 开口率×成单率）
-//   跑出率 = 深转累计≥5单素材数 ÷ 全部素材数
+// ============ 编导/总览五率统一计算（基础名去重，分母含无消耗） ============
+// 口径（2026-10-26 改名）：
+//   转化成交率 = 转化>0素材数 ÷ 产出投放素材数
+//   高潜成交率（转化） = 深转>0素材数 ÷ 转化>0素材数
+//   高潜成交率 = 深转>0素材数 ÷ 产出投放素材数
+//   高潜跑出率 = 深转≥5素材数 ÷ 产出投放素材数
+//   高潜跑出率（转化） = 深转≥5素材数 ÷ 转化>0素材数
 function _dateRange(dates){
   const keys = dates.map(d => d.replace('/',''));
   return {s: keys.reduce((a,b) => a < b ? a : b), e: keys.reduce((a,b) => a > b ? a : b)};
@@ -632,10 +633,11 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
   const pct = (a,b) => b > 0 ? Math.round(a/b*1000)/10 : null;
   return {
     total, conv, gq, runout,
-    open_rate: pct(conv, total),           // 开口率
-    order_rate: pct(gq, Math.max(conv, gq)),  // 成单率
-    chulv_rate: pct(gq, total),            // 出单率
-    run_rate: pct(runout, total),          // 跑出率
+    open_rate: pct(conv, total),           // 转化成交率（内部键沿用旧名）
+    order_rate: pct(gq, Math.max(conv, gq)),  // 高潜成交率（转化）
+    chulv_rate: pct(gq, total),            // 高潜成交率
+    run_rate: pct(runout, total),          // 高潜跑出率
+    conv_run_rate: pct(runout, conv),      // 高潜跑出率（转化）
   };
 }
 
@@ -801,10 +803,11 @@ function renderTimingDirector(){
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px\"><span style="width:8px;height:8px;border-radius:50%;background:#1E40AF;display:inline-block"></span><span style="font-size:13px;font-weight:700;color:#1E40AF\">\u5168\u90e8\u7f16\u5bfc</span></div>' +
       '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px\">' +
       _c4('\u7d20\u6750\u4ea7\u51fa', String(_allA.produce_n), '\u56fe\u6587' + _allA.tuwen_n + ' / \u89c6\u9891' + _allA.video_n, '#1E40AF') +
-      _c4('\u5f00\u53e3\u7387', _allA.open_rate != null ? _allA.open_rate+'%' : '\u2014', _allA.open_n + '/' + _allA.total, '#1E40AF') +
-      _c4('\u6210\u5355\u7387', _allA.order_rate != null ? _allA.order_rate+'%' : '\u2014', _allA.order_n + '/' + _allA.open_n, '#8B5CF6') +
-      _c4('\u51fa\u5355\u7387', _allA.total ? (Math.round(_allA.order_n/_allA.total*1000)/10)+'%' : '\u2014', _allA.order_n + '/' + _allA.total, '#D97706') +
-      _c4('\u8dd1\u51fa\u7387', _allA.run_rate != null ? _allA.run_rate+'%' : '\u2014', _allA.runout + '/' + _allA.total, '#D97706') +
+      _c4('\u8f6c\u5316\u6210\u4ea4\u7387', _allA.open_rate != null ? _allA.open_rate+'%' : '\u2014', _allA.open_n + '/' + _allA.total, '#1E40AF') +
+      _c4('\u9ad8\u6f5c\u6210\u4ea4\u7387\uff08\u8f6c\u5316\uff09', _allA.order_rate != null ? _allA.order_rate+'%' : '\u2014', _allA.order_n + '/' + _allA.open_n, '#8B5CF6') +
+      _c4('\u9ad8\u6f5c\u6210\u4ea4\u7387', _allA.total ? (Math.round(_allA.order_n/_allA.total*1000)/10)+'%' : '\u2014', _allA.order_n + '/' + _allA.total, '#D97706') +
+      _c4('\u9ad8\u6f5c\u8dd1\u51fa\u7387', _allA.run_rate != null ? _allA.run_rate+'%' : '\u2014', _allA.runout + '/' + _allA.total, '#D97706') +
+      _c4('\u9ad8\u6f5c\u8dd1\u51fa\u7387\uff08\u8f6c\u5316\uff09', _allA.conv_run_rate != null ? _allA.conv_run_rate+'%' : '\u2014', _allA.runout + '/' + _allA.open_n, '#9A3412') +
       _c4('\u4ea7\u51fa\u2192\u9996\u8f6c', _allA.gap_pc ? _allA.gap_pc.mean + '<span style="opacity:.55;font-size:10px"> / ' + _allA.gap_pc.median + '</span>' : '\u2014', '\u5747 / \u4e2d', '#D97706') +
       _c4('\u4ea7\u51fa\u2192\u8d77\u91cf', _allA.gap_pe ? _allA.gap_pe.mean + '<span style="opacity:.55;font-size:10px"> / ' + _allA.gap_pe.median + '</span>' : '\u2014', '\u5747 / \u4e2d', '#D97706') +
       _c4('\u8d77\u91cf\u2192\u9996\u8f6c', _allA.gap_ec ? _allA.gap_ec.mean + '<span style="opacity:.55;font-size:10px"> / ' + _allA.gap_ec.median + '</span>' : '\u2014', '\u5747 / \u4e2d', '#D97706') +
@@ -854,7 +857,8 @@ function renderTimingDirector(){
             tuwen_n: tuwenN, video_n: videoN, produce_n: produceN,
             open_rate: total ? Math.round(openN/total*1000)/10 : null,
             order_rate: openN ? Math.round(orderN/openN*1000)/10 : null,
-            run_rate: total ? Math.round(runN/total*1000)/10 : null};
+            run_rate: total ? Math.round(runN/total*1000)/10 : null,
+            conv_run_rate: openN ? Math.round(runN/openN*1000)/10 : null};
   }
   const html = Object.keys(rows).map(p => {
     const d = aggFor(p);
@@ -873,24 +877,29 @@ function renderTimingDirector(){
           <div style="font-size:10px;color:#64748B;margin-top:1px">图文${d.tuwen_n} / 视频${d.video_n}</div>
         </div>
         <div style="background:#F8FAFC;border-radius:6px;padding:7px 9px">
-          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">开口率 <span class="help-tip" data-tip="开口率 = 有转化素材数 ÷ 该编导全部素材数（按基础名去重）。衡量素材能否把人聊起来（首次开口加微信并说满三句话）。"></span></div>
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">转化成交率 <span class="help-tip" data-tip="转化成交率 = 转化>0素材数 ÷ 产出投放素材数（按基础名去重）。转化口径阶段性目标不同（加粉/三次开口）。"></span></div>
           <div style="font-size:14px;font-weight:700;color:#1E40AF;font-family:monospace">${d.open_rate != null ? d.open_rate+'%' : '—'}</div>
           <div style="font-size:10px;color:#64748B;margin-top:1px">${d.open_n}/${d.total} 条</div>
         </div>
         <div style="background:#F8FAFC;border-radius:6px;padding:7px 9px">
-          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">成单率 <span class="help-tip" data-tip="成单率 = 有高潜素材数 ÷ 有转化素材数。高潜 = 开口后付费¥19成单回传，含销售跟进因素。"></span></div>
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">高潜成交率（转化） <span class="help-tip" data-tip="高潜成交率（转化） = 深转>0素材数 ÷ 转化>0素材数（按基础名去重）。"></span></div>
           <div style="font-size:14px;font-weight:700;color:#8B5CF6;font-family:monospace">${d.order_rate != null ? d.order_rate+'%' : '—'}</div>
           <div style="font-size:10px;color:#64748B;margin-top:1px">${d.order_n}/${d.open_n} 条</div>
         </div>
         <div style="background:#FFF7ED;border-radius:6px;padding:7px 9px">
-          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">跑出率 <span class="help-tip" data-tip="跑出率 = 深转5单及以上素材数 ÷ 产出素材总数（基础名去重）"></span></div>
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">高潜跑出率 <span class="help-tip" data-tip="高潜跑出率 = 深转≥5单素材数 ÷ 产出投放素材数（按基础名去重）。"></span></div>
           <div style="font-size:14px;font-weight:700;color:#D97706;font-family:monospace">${d.run_rate != null ? d.run_rate+'%' : '—'}</div>
           <div style="font-size:10px;color:#64748B;margin-top:1px">${d.runout}/${d.total} 条</div>
         </div>
         <div style="background:#F8FAFC;border-radius:6px;padding:7px 9px">
-          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">出单率 <span class="help-tip" data-tip="出单率 = 有高潜素材数 ÷ 该编导全部素材数 = 开口率 × 成单率。"></span></div>
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">高潜成交率 <span class="help-tip" data-tip="高潜成交率 = 深转>0素材数 ÷ 产出投放素材数（按基础名去重）。"></span></div>
           <div style="font-size:14px;font-weight:700;color:#D97706;font-family:monospace">${d.total ? (Math.round(d.order_n/d.total*1000)/10)+'%' : '—'}</div>
           <div style="font-size:10px;color:#64748B;margin-top:1px">${d.order_n}/${d.total} 条</div>
+        </div>
+        <div style="background:#F8FAFC;border-radius:6px;padding:7px 9px">
+          <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">高潜跑出率（转化） <span class="help-tip" data-tip="高潜跑出率（转化） = 深转≥5单素材数 ÷ 转化>0素材数（按基础名去重）。"></span></div>
+          <div style="font-size:14px;font-weight:700;color:#9A3412;font-family:monospace">${d.open_n ? (Math.round(d.runout/d.open_n*1000)/10)+'%' : '—'}</div>
+          <div style="font-size:10px;color:#64748B;margin-top:1px">${d.runout}/${d.open_n} 条</div>
         </div>
         <div style="background:#FFFBEB;border-radius:6px;padding:7px 9px">
           <div style="font-size:10px;color:#94A3B8;margin-bottom:1px">产出→首转 <span class="help-tip" data-tip="产出→首转 = 首次有转化日期 − 产出日期。"></span></div>
