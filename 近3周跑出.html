@@ -1132,13 +1132,14 @@ let passPersonFilter = 'all';   // all | 编导名
 let passWeek = 'all';           // all | w1(最近7天) | w2 | w3
 
 function weekRangeLabel(wIdx) {
-  // w1=最近7天，w2=再前7天，w3=再前7天；返回 'MM/DD-MM/DD'
   const [start, end] = passWindowForDates();
-  const histMode = !(typeof DateBar !== 'undefined' && DateBar.touched);
   const f = d => ('0'+(d.getMonth()+1)).slice(-2) + '/' + ('0'+d.getDate()).slice(-2);
-  if (wIdx === 'w1') return f(new Date(end.getTime() - 6*86400000)) + '-' + f(end);
-  if (wIdx === 'w2') return f(new Date(end.getTime() - 13*86400000)) + '-' + f(new Date(end.getTime() - 7*86400000));
-  return f(start) + '-' + f(new Date(end.getTime() - 14*86400000));
+  const endDow = end.getDay();
+  const weekEnd = new Date(end.getTime() + ((7 - endDow) % 7) * 86400000);
+  const weekStart = new Date(weekEnd.getTime() - 6*86400000);
+  if (wIdx === 'w1') return f(weekStart) + '-' + f(weekEnd);
+  if (wIdx === 'w2') return f(new Date(weekStart.getTime() - 7*86400000)) + '-' + f(new Date(weekEnd.getTime() - 7*86400000));
+  return f(new Date(weekStart.getTime() - 14*86400000)) + '-' + f(new Date(weekEnd.getTime() - 14*86400000));
 }
 
 function setPassWeek(w, btn) {
