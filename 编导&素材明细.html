@@ -630,7 +630,7 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
   // mode: 'any'（默认，窗口内任意一天有转化/高潜）| 'first'（首次转化/高潜在窗口内）
   const dr = win || _dateRange(dates);
   const m = mode || 'any';
-  let total=0, conv=0, gq=0, runout=0;
+  let total=0, conv=0, gq=0, runout=0, runout_conv=0;
   (OPEN_RATE_DATA || []).forEach(x => {
     if (p !== '__ALL__' && x.p !== p) return;
     // 类型过滤（type 为空按视频处理）
@@ -656,28 +656,34 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
       if (!(x.mn <= dr.e && x.mx >= dr.s)) return;
     }
     total++;
+    let convCounted = false;
     if (m === 'first') {
-      if (x.cd && x.cd >= dr.s && x.cd <= dr.e) conv++;
+      if (x.cd && x.cd >= dr.s && x.cd <= dr.e) { conv++; convCounted = true; }
       if (x.gd && x.gd >= dr.s && x.gd <= dr.e) gq++;
     } else if (m === 'hist') {
       // 历史口径：只要有过转化/高潜（不限窗口）
-      if (x.cd) conv++;
+      if (x.cd) { conv++; convCounted = true; }
       if (x.gd) gq++;
     } else {
       // 窗口内任一转化/高潜：首日<=窗口末 且 末日>=窗口首
-      if (x.cd && x.ld && x.cd <= dr.e && x.ld >= dr.s) conv++;
+      if (x.cd && x.ld && x.cd <= dr.e && x.ld >= dr.s) { conv++; convCounted = true; }
       if (x.gd && x.lg && x.gd <= dr.e && x.lg >= dr.s) gq++;
     }
-    if ((x.gq_total || 0) >= 5) runout++;
+    // 跑出（历史累计深转≥5）：计入「高潜跑出率」的分子；「高潜跑出率（转化）」的分子
+    // 只算有转化且跑出的素材（与分母 conv 同口径，防超100%）
+    if ((x.gq_total || 0) >= 5) {
+      runout++;
+      if (convCounted) runout_conv++;
+    }
   });
   const pct = (a,b) => b > 0 ? Math.round(a/b*1000)/10 : null;
   return {
-    total, conv, gq, runout,
+    total, conv, gq, runout, runout_conv,
     open_rate: pct(conv, total),           // 转化成交率（内部键沿用旧名）
     order_rate: pct(gq, Math.max(conv, gq)),  // 高潜成交率（转化）
     chulv_rate: pct(gq, total),            // 高潜成交率
     run_rate: pct(runout, total),          // 高潜跑出率
-    conv_run_rate: pct(runout, conv),      // 高潜跑出率（转化）
+    conv_run_rate: pct(runout_conv, conv), // 高潜跑出率（转化）
   };
 }
 
@@ -848,7 +854,7 @@ function mergedRows(dates) {
       ['\u9ad8\u6f5c\u6210\u4ea4\u7387\uff08\u8f6c\u5316\uff09', _all4.order_rate != null ? _all4.order_rate+'%' : '\u2014', _all4.gq+'/'+Math.max(_all4.gq,_all4.conv)+' \u6761', '#8B5CF6'],
       ['\u9ad8\u6f5c\u6210\u4ea4\u7387', _all4.chulv_rate != null ? _all4.chulv_rate+'%' : '\u2014', _all4.gq+'/'+_all4.total+' \u6761', '#D97706'],
       ['\u9ad8\u6f5c\u8dd1\u51fa\u7387', _all4.run_rate != null ? _all4.run_rate+'%' : '\u2014', _all4.runout+'/'+_all4.total+' \u6761', '#D97706'],
-      ['\u9ad8\u6f5c\u8dd1\u51fa\u7387\uff08\u8f6c\u5316\uff09', _all4.conv_run_rate != null ? _all4.conv_run_rate+'%' : '\u2014', _all4.runout+'/'+_all4.conv+' \u6761', '#9A3412']
+      ['\u9ad8\u6f5c\u8dd1\u51fa\u7387\uff08\u8f6c\u5316\uff09', _all4.conv_run_rate != null ? _all4.conv_run_rate+'%' : '\u2014', _all4.runout_conv+'/'+_all4.conv+' \u6761', '#9A3412']
     ];
     const cellHtml = cells.map(c => '<div style="background:#F8FAFC;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:10px;color:#94A3B8">' + c[0] + '</div><div style="font-size:13px;font-weight:700;font-family:monospace;color:' + c[3] + '">' + c[1] + '</div>' + (c[2] ? '<div style="font-size:9px;color:#64748B">' + c[2] + '</div>' : '') + '</div>').join('');
     _el.innerHTML = '<div style="background:#fff;border:1.5px solid #1E40AF44;border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
@@ -872,7 +878,7 @@ function mergedRows(dates) {
     if (kind === 'order') return f.gq + ' / ' + Math.max(f.gq, f.conv) + ' \u6761';
     if (kind === 'run') return f.runout + ' / ' + f.total + ' \u6761';
     if (kind === 'chulv') return f.gq + ' / ' + f.total + ' \u6761';
-    if (kind === 'conv_run') return f.runout + ' / ' + f.conv + ' \u6761';
+    if (kind === 'conv_run') return f.runout_conv + ' / ' + f.conv + ' \u6761';
     return f.conv + ' / ' + f.total + ' \u6761';
   }
   function frTip(p, kind){
@@ -880,7 +886,7 @@ function mergedRows(dates) {
     if (kind === 'order') return '\u6df1\u8f6c>0\u7d20\u6750 ' + f.gq + ' \u6761 \u00f7 \u8f6c\u5316>0\u7d20\u6750 ' + Math.max(f.gq, f.conv) + ' \u6761';
     if (kind === 'run') return '\u6df1\u8f6c\u22655\u5355\u7d20\u6750 ' + f.runout + ' \u6761 \u00f7 \u4ea7\u51fa\u6295\u653e\u7d20\u6750 ' + f.total + ' \u6761';
     if (kind === 'chulv') return '\u6df1\u8f6c>0\u7d20\u6750 ' + f.gq + ' \u6761 \u00f7 \u4ea7\u51fa\u6295\u653e\u7d20\u6750 ' + f.total + ' \u6761';
-    if (kind === 'conv_run') return '\u6df1\u8f6c\u22655\u5355\u7d20\u6750 ' + f.runout + ' \u6761 \u00f7 \u8f6c\u5316>0\u7d20\u6750 ' + f.conv + ' \u6761';
+    if (kind === 'conv_run') return '\u6df1\u8f6c\u22655\u5355\u4e14\u6709\u8f6c\u5316\u7684\u7d20\u6750 ' + f.runout_conv + ' \u6761 \u00f7 \u8f6c\u5316>0\u7d20\u6750 ' + f.conv + ' \u6761';
     return '\u8f6c\u5316>0\u7d20\u6750 ' + f.conv + ' \u6761 \u00f7 \u4ea7\u51fa\u6295\u653e\u7d20\u6750 ' + f.total + ' \u6761';
   }
   renderAllDirectorCard();
@@ -1957,7 +1963,7 @@ function renderAllDirectorCard(){
     ['高潜成交率（转化）', _all4.order_rate != null ? _all4.order_rate+'%' : '—', _all4.gq+'/'+Math.max(_all4.gq,_all4.conv)+' 条', '#8B5CF6'],
     ['高潜成交率', _all4.chulv_rate != null ? _all4.chulv_rate+'%' : '—', _all4.gq+'/'+_all4.total+' 条', '#D97706'],
     ['高潜跑出率', _all4.run_rate != null ? _all4.run_rate+'%' : '—', _all4.runout+'/'+_all4.total+' 条', '#D97706'],
-    ['高潜跑出率（转化）', _all4.conv_run_rate != null ? _all4.conv_run_rate+'%' : '—', _all4.runout+'/'+_all4.conv+' 条', '#9A3412']
+    ['高潜跑出率（转化）', _all4.conv_run_rate != null ? _all4.conv_run_rate+'%' : '—', _all4.runout_conv+'/'+_all4.conv+' 条', '#9A3412']
   ];
   const cellHtml = cells.map(c =>
     '<div style="background:#F8FAFC;border-radius:6px;padding:6px 8px;text-align:center"><div style="font-size:10px;color:#94A3B8">' + c[0] + '</div><div style="font-size:13px;font-weight:700;font-family:monospace;color:' + c[3] + '">' + c[1] + '</div>' + (c[2] ? '<div style="font-size:9px;color:#64748B">' + c[2] + '</div>' : '') + '</div>'

@@ -589,7 +589,7 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
   // mode: 'any'（默认，窗口内任意一天有转化/高潜）| 'first'（首次转化/高潜在窗口内）
   const dr = win || _dateRange(dates);
   const m = mode || 'any';
-  let total=0, conv=0, gq=0, runout=0;
+  let total=0, conv=0, gq=0, runout=0, runout_conv=0;
   (OPEN_RATE_DATA || []).forEach(x => {
     if (p !== '__ALL__' && x.p !== p) return;
     // 类型过滤（type 为空按视频处理）
@@ -615,28 +615,34 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
       if (!(x.mn <= dr.e && x.mx >= dr.s)) return;
     }
     total++;
+    let convCounted = false;
     if (m === 'first') {
-      if (x.cd && x.cd >= dr.s && x.cd <= dr.e) conv++;
+      if (x.cd && x.cd >= dr.s && x.cd <= dr.e) { conv++; convCounted = true; }
       if (x.gd && x.gd >= dr.s && x.gd <= dr.e) gq++;
     } else if (m === 'hist') {
       // 历史口径：只要有过转化/高潜（不限窗口）
-      if (x.cd) conv++;
+      if (x.cd) { conv++; convCounted = true; }
       if (x.gd) gq++;
     } else {
       // 窗口内任一转化/高潜：首日<=窗口末 且 末日>=窗口首
-      if (x.cd && x.ld && x.cd <= dr.e && x.ld >= dr.s) conv++;
+      if (x.cd && x.ld && x.cd <= dr.e && x.ld >= dr.s) { conv++; convCounted = true; }
       if (x.gd && x.lg && x.gd <= dr.e && x.lg >= dr.s) gq++;
     }
-    if ((x.gq_total || 0) >= 5) runout++;
+    // 跑出（历史累计深转≥5）：计入「高潜跑出率」的分子；「高潜跑出率（转化）」的分子
+    // 只算有转化且跑出的素材（与分母 conv 同口径，防超100%）
+    if ((x.gq_total || 0) >= 5) {
+      runout++;
+      if (convCounted) runout_conv++;
+    }
   });
   const pct = (a,b) => b > 0 ? Math.round(a/b*1000)/10 : null;
   return {
-    total, conv, gq, runout,
+    total, conv, gq, runout, runout_conv,
     open_rate: pct(conv, total),           // 转化成交率（内部键沿用旧名）
     order_rate: pct(gq, Math.max(conv, gq)),  // 高潜成交率（转化）
     chulv_rate: pct(gq, total),            // 高潜成交率
     run_rate: pct(runout, total),          // 高潜跑出率
-    conv_run_rate: pct(runout, conv),      // 高潜跑出率（转化）
+    conv_run_rate: pct(runout_conv, conv), // 高潜跑出率（转化）
   };
 }
 

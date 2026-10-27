@@ -513,7 +513,7 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
   // mode: 'any'（默认，窗口内任意一天有转化/高潜）| 'first'（首次转化/高潜在窗口内）
   const dr = win || _dateRange(dates);
   const m = mode || 'any';
-  let total=0, conv=0, gq=0, runout=0;
+  let total=0, conv=0, gq=0, runout=0, runout_conv=0;
   (OPEN_RATE_DATA || []).forEach(x => {
     if (p !== '__ALL__' && x.p !== p) return;
     // 类型过滤（type 为空按视频处理）
@@ -539,28 +539,34 @@ function computeFourRates(p, dates, pdRange, pdSet, type, win, mode){
       if (!(x.mn <= dr.e && x.mx >= dr.s)) return;
     }
     total++;
+    let convCounted = false;
     if (m === 'first') {
-      if (x.cd && x.cd >= dr.s && x.cd <= dr.e) conv++;
+      if (x.cd && x.cd >= dr.s && x.cd <= dr.e) { conv++; convCounted = true; }
       if (x.gd && x.gd >= dr.s && x.gd <= dr.e) gq++;
     } else if (m === 'hist') {
       // 历史口径：只要有过转化/高潜（不限窗口）
-      if (x.cd) conv++;
+      if (x.cd) { conv++; convCounted = true; }
       if (x.gd) gq++;
     } else {
       // 窗口内任一转化/高潜：首日<=窗口末 且 末日>=窗口首
-      if (x.cd && x.ld && x.cd <= dr.e && x.ld >= dr.s) conv++;
+      if (x.cd && x.ld && x.cd <= dr.e && x.ld >= dr.s) { conv++; convCounted = true; }
       if (x.gd && x.lg && x.gd <= dr.e && x.lg >= dr.s) gq++;
     }
-    if ((x.gq_total || 0) >= 5) runout++;
+    // 跑出（历史累计深转≥5）：计入「高潜跑出率」的分子；「高潜跑出率（转化）」的分子
+    // 只算有转化且跑出的素材（与分母 conv 同口径，防超100%）
+    if ((x.gq_total || 0) >= 5) {
+      runout++;
+      if (convCounted) runout_conv++;
+    }
   });
   const pct = (a,b) => b > 0 ? Math.round(a/b*1000)/10 : null;
   return {
-    total, conv, gq, runout,
+    total, conv, gq, runout, runout_conv,
     open_rate: pct(conv, total),           // 转化成交率（内部键沿用旧名）
     order_rate: pct(gq, Math.max(conv, gq)),  // 高潜成交率（转化）
     chulv_rate: pct(gq, total),            // 高潜成交率
     run_rate: pct(runout, total),          // 高潜跑出率
-    conv_run_rate: pct(runout, conv),      // 高潜跑出率（转化）
+    conv_run_rate: pct(runout_conv, conv), // 高潜跑出率（转化）
   };
 }
 
@@ -755,7 +761,8 @@ const P3 = {
     // 五率（基础名行集合，指标累计窗口内判断）
     const convN = computed.filter(c => c.conv > 0).length;
     const gqN = computed.filter(c => c.gq > 0).length;
-    const runN = computed.filter(c => c.gq >= 5).length;
+    const runN = computed.filter(c => c.gq >= 5 && c.conv > 0).length;   // 有转化且深转≥5
+    const runN_all = computed.filter(c => c.gq >= 5).length;               // 深转≥5（跑出率/总）
     const total = computed.length;
     // 产出数量（全量工作量口径，含过审/未过审，0-3改按基础名算1条）
     const prodN = prod.length;
@@ -777,7 +784,7 @@ const P3 = {
       ${cell('转化成交率', total > 0 ? pct1(Math.round(convN/total*1000)/10) : '—')}
       ${cell('高潜成交率（转化）', (convN || gqN) > 0 ? pct1(Math.round(gqN/Math.max(convN,gqN)*1000)/10) : '—')}
       ${cell('高潜成交率', total > 0 ? pct1(Math.round(gqN/total*1000)/10) : '—')}
-      ${cell('高潜跑出率', total > 0 ? pct1(Math.round(runN/total*1000)/10) : '—')}
+      ${cell('高潜跑出率', total > 0 ? pct1(Math.round(runN_all/total*1000)/10) : '—')}
       ${cell('高潜跑出率（转化）', convN > 0 ? pct1(Math.round(runN/convN*1000)/10) : '—')}
       ${cell('产出素材数', prodN)}
       ${cell('图文/视频', prodTw + ' / ' + prodVd)}
@@ -830,7 +837,8 @@ const P3 = {
       const total = sub.length;
       const convN = sub.filter(c => c.conv > 0).length;
       const gqN = sub.filter(c => c.gq > 0).length;
-      const runN = sub.filter(c => c.gq >= 5).length;
+      const runN = sub.filter(c => c.gq >= 5 && c.conv > 0).length;   // 有转化且深转≥5
+      const runN_all = sub.filter(c => c.gq >= 5).length;
       // 编导产出数量（全量工作量口径）
       const ps = (prod || []).filter(x => x.p === p);
       const tw = ps.filter(x => x.t === 'tuwen').length;
@@ -852,8 +860,8 @@ const P3 = {
           ${cell('转化成交率', '转化成交率 = 转化>0素材数 ÷ 产出投放素材数', total>0 ? pct1(Math.round(convN/total*1000)/10) : '—', convN+'/'+total, '#1E40AF')}
           ${cell('高潜成交率（转化）', '高潜成交率（转化） = 深转>0素材数 ÷ 转化>0素材数', (convN||gqN)>0 ? pct1(Math.round(gqN/Math.max(convN,gqN)*1000)/10) : '—', gqN+'/'+Math.max(convN,gqN), '#8B5CF6')}
           ${cell('高潜成交率', '高潜成交率 = 深转>0素材数 ÷ 产出投放素材数', total>0 ? pct1(Math.round(gqN/total*1000)/10) : '—', gqN+'/'+total, '#D97706')}
-          ${cell('高潜跑出率', '高潜跑出率 = 深转≥5素材数 ÷ 产出投放素材数', total>0 ? pct1(Math.round(runN/total*1000)/10) : '—', runN+'/'+total, '#D97706')}
-          ${cell('高潜跑出率（转化）', '高潜跑出率（转化） = 深转≥5素材数 ÷ 转化>0素材数', convN>0 ? pct1(Math.round(runN/convN*1000)/10) : '—', runN+'/'+convN, '#9A3412')}
+          ${cell('高潜跑出率', '高潜跑出率 = 深转≥5素材数 ÷ 产出投放素材数', total>0 ? pct1(Math.round(runN_all/total*1000)/10) : '—', runN_all+'/'+total, '#D97706')}
+          ${cell('高潜跑出率（转化）', '高潜跑出率（转化） = 深转≥5且转化>0素材数 ÷ 转化>0素材数', convN>0 ? pct1(Math.round(runN/convN*1000)/10) : '—', runN+'/'+convN, '#9A3412')}
         </div>
       </div>`;
     }).filter(Boolean);
@@ -883,16 +891,17 @@ const P3 = {
           .map(r => this.compute(r, m.s, endTime));
         const convN = computed.filter(c => c.conv > 0).length;
         const gqN = computed.filter(c => c.gq > 0).length;
-        const runN = computed.filter(c => c.gq >= 5).length;
+        const runN = computed.filter(c => c.gq >= 5 && c.conv > 0).length;   // 有转化且深转≥5
+        const runN_all = computed.filter(c => c.gq >= 5).length;
         const total = computed.length;
-        return {convN, gqN, runN, total,
+        return {convN, gqN, runN, runN_all, total,
                 cr: total>0 ? (convN/total*100).toFixed(1) : '—',
                 crFrac: convN+'/'+total,
                 gqcr: (convN||gqN)>0 ? (gqN/Math.max(convN,gqN)*100).toFixed(1) : '—',
                 gqcrFrac: gqN+'/'+Math.max(convN,gqN),
                 gqr: total>0 ? (gqN/total*100).toFixed(1) : '—',
                 gqrFrac: gqN+'/'+total,
-                runr: total>0 ? (runN/total*100).toFixed(1) : '—',
+                runr: total>0 ? (runN_all/total*100).toFixed(1) : '—',
                 runrFrac: runN+'/'+total,
                 crrun: convN>0 ? (runN/convN*100).toFixed(1) : '—',
                 crrunFrac: runN+'/'+convN};
